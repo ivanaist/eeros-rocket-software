@@ -622,16 +622,16 @@ function drawStartRocket() {
     const scale = 2.4;
     const bw = 24 * scale * 0.4;
     const bh = 43 * scale * 0.7;
-    const nh = bw * 2.4;
-    const fh = bw * 1.8;
-    const mh = bw * 0.5;
-    const totalH = nh + bh + fh * 0.6 + mh;
+    const nh = bw * 1.85;
+    const fh = bh * 0.22;
+    const mh = fh * 0.9;
+    const totalH = nh + bh + fh + 8;
     const topY = Math.max(6, (H - totalH) / 2);
     const cx   = W / 2;
-    drawNose (ctx, cx, topY,                          bw, nh, 'ogive');
-    drawBody (ctx, cx, topY + nh,                     bw, bh);
-    drawFins (ctx, cx, topY + nh + bh,                bw, fh, 3, 'delta');
-    drawMotor(ctx, cx, topY + nh + bh + fh * .55,     bw * .48, mh);
+    drawNose (ctx, cx, topY,           bw, nh, 'ogive');
+    drawBody (ctx, cx, topY + nh,      bw, bh);
+    drawMotor(ctx, cx, topY + nh + bh, bw * 0.82, mh);
+    drawFins (ctx, cx, topY + nh + bh, bw, fh, 3, 'delta');
 }
 
 function runStartStars() {
@@ -795,17 +795,17 @@ function drawBuilder() {
     const scale = Math.min(maxH / (R.len + 20), 4.5);
     const bw = Math.max(R.dia * scale * 0.5, 9);
     const bh = R.len * scale;
-    const nh = Math.max(bw * 2.4, 18);
-    const fh = Math.max(bw * 2.0, 14);
-    const mh = bw * 0.55;
-    const totalH = nh + bh + fh * 0.6 + mh;
+    const nh = Math.max(bw * 1.85, 14);
+    const fh = Math.max(bh * 0.22, 10);
+    const mh = fh * 0.9;
+    const totalH = nh + bh + fh + 8;
     const topY = (H - totalH) / 2;
     const cx = W / 2;
 
     drawNose (ctx, cx, topY, bw, nh, R.nose);
     drawBody (ctx, cx, topY + nh, bw, bh);
+    drawMotor(ctx, cx, topY + nh + bh, bw * 0.82, mh);
     drawFins (ctx, cx, topY + nh + bh, bw, fh, R.fins, R.finS);
-    drawMotor(ctx, cx, topY + nh + bh + fh * 0.55, bw * 0.48, mh);
 
     // Label: body length
     ctx.fillStyle = '#3d4a6a';
@@ -887,8 +887,9 @@ function drawBody(ctx, cx, y, bw, bh) {
 }
 
 function drawFins(ctx, cx, y, bw, fh, n, shape) {
-    drawOneFin(ctx, cx - bw, y, bw * 1.9, fh, shape, true);
-    drawOneFin(ctx, cx + bw, y, bw * 1.9, fh, shape, false);
+    const fw = fh * 1.1;
+    drawOneFin(ctx, cx - bw, y, fw, fh, shape, true);
+    drawOneFin(ctx, cx + bw, y, fw, fh, shape, false);
 }
 
 function drawOneFin(ctx, x, y, fw, fh, shape, left) {
@@ -971,14 +972,14 @@ function sizeLaunchCanvas() {
 function drawRocketAt(ctx, cx, bodyBottomY, scale) {
     const bw = Math.max(R.dia * scale * 0.4, 5);
     const bh = R.len * scale * 0.7;
-    const nh = bw * 2.4;
-    const fh = bw * 1.8;
-    const mh = bw * 0.5;
+    const nh = bw * 1.85;
+    const fh = bh * 0.22;
+    const mh = fh * 0.9;
     const topY = bodyBottomY - bh - nh;
-    drawNose (ctx, cx, topY,             bw, nh, R.nose);
-    drawBody (ctx, cx, topY + nh,        bw, bh);
-    drawFins (ctx, cx, topY + nh + bh,   bw, fh, R.fins, R.finS);
-    drawMotor(ctx, cx, topY + nh + bh + fh * .5, bw * .45, mh);
+    drawNose (ctx, cx, topY,         bw, nh, R.nose);
+    drawBody (ctx, cx, topY + nh,    bw, bh);
+    drawMotor(ctx, cx, bodyBottomY,  bw * 0.82, mh);
+    drawFins (ctx, cx, bodyBottomY,  bw, fh, R.fins, R.finS);
 }
 
 // ─────────────────────────────────────────────
@@ -1094,10 +1095,10 @@ function renderFrame() {
     // ── Rocket geometry (precompute) ──
     const bw = Math.max(R.dia * SCALE * 0.4, 5);
     const bh = R.len * SCALE * 0.7;
-    const nh = bw * 2.4;
-    const fh = bw * 1.8;
-    const mh = bw * 0.5;
-    const rocketTotalH = nh + bh + fh * 0.5 + mh;
+    const nh = bw * 1.85;
+    const fh = bh * 0.22;
+    const mh = fh * 0.9;
+    const rocketTotalH = nh + bh + fh;
 
     // ── Rocket screen position ──
     // Rocket rises from launchpad (H*0.78) to cruise height (H*0.55) over first 80m
@@ -1106,7 +1107,7 @@ function renderFrame() {
     const ramp = Math.min(alt / 80, 1);
     const bodyBottomY = launchBodyY - ramp * (launchBodyY - cruiseBodyY);
     const noseTipY    = bodyBottomY - bh - nh;
-    const motorBotY   = bodyBottomY + fh * 0.5 + mh;
+    const motorBotY   = bodyBottomY + mh * 1.05;
 
     // ── Ground Y ──
     // Ground stays near launchpad at start, scrolls down as rocket climbs
@@ -1221,40 +1222,68 @@ function renderFrame() {
     });
     ctx.globalAlpha = 1;
 
-    // ── Flame (larger, more dramatic, with glow ring) ──
+    // ── Flame ──
     if (phase === 'powered') {
-        const flicker = 0.82 + Math.random() * 0.36;
-        const flameH  = bw * 5.0 * flicker;
+        const vel = SIM ? Math.abs(SIM.velocity) : 0;
+        const flicker  = 0.85 + Math.random() * 0.30;
+        const speedFac = Math.max(0.55, 1 - vel / 380);
+        const flameH   = bw * 5.5 * flicker;
+        const flameW   = bw * 0.46 * speedFac;
 
-        // Outer orange glow halo
-        ctx.globalAlpha = 0.16;
-        ctx.fillStyle = '#ff5500';
+        // Diffuse outer radial glow
+        const haloG = ctx.createRadialGradient(W/2, motorBotY + flameH * 0.22, 0,
+                                               W/2, motorBotY + flameH * 0.22, bw * 3.2);
+        haloG.addColorStop(0,   'rgba(255,140,0,0.20)');
+        haloG.addColorStop(0.5, 'rgba(255,55,0,0.09)');
+        haloG.addColorStop(1,   'rgba(255,0,0,0)');
+        ctx.fillStyle = haloG;
         ctx.beginPath();
-        ctx.ellipse(W/2, motorBotY + flameH * 0.3, bw * 2.8, flameH * 0.52, 0, 0, Math.PI * 2);
+        ctx.ellipse(W/2, motorBotY + flameH * 0.22, bw * 3.2, flameH * 0.50, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.globalAlpha = 1;
 
-        // Main flame shape
+        // Main tapered flame
         const grad = ctx.createLinearGradient(W/2, motorBotY, W/2, motorBotY + flameH);
         grad.addColorStop(0,    'rgba(255,255,255,0.98)');
-        grad.addColorStop(0.10, 'rgba(255,240,120,0.96)');
-        grad.addColorStop(0.38, 'rgba(255,100,15,0.88)');
-        grad.addColorStop(0.70, 'rgba(255,30,0,0.55)');
-        grad.addColorStop(1,    'rgba(200,0,0,0)');
+        grad.addColorStop(0.08, 'rgba(255,250,200,0.95)');
+        grad.addColorStop(0.25, 'rgba(255,165,20,0.90)');
+        grad.addColorStop(0.55, 'rgba(255,50,0,0.65)');
+        grad.addColorStop(0.82, 'rgba(220,0,0,0.28)');
+        grad.addColorStop(1,    'rgba(180,0,0,0)');
         ctx.beginPath();
-        ctx.moveTo(W/2 - bw * 0.44, motorBotY);
-        ctx.quadraticCurveTo(W/2 - bw * 0.12, motorBotY + flameH * 0.52, W/2, motorBotY + flameH);
-        ctx.quadraticCurveTo(W/2 + bw * 0.12, motorBotY + flameH * 0.52, W/2 + bw * 0.44, motorBotY);
+        ctx.moveTo(W/2 - flameW, motorBotY);
+        ctx.bezierCurveTo(W/2 - flameW * 0.8, motorBotY + flameH * 0.35,
+                          W/2 - flameW * 0.08, motorBotY + flameH * 0.78,
+                          W/2, motorBotY + flameH);
+        ctx.bezierCurveTo(W/2 + flameW * 0.08, motorBotY + flameH * 0.78,
+                          W/2 + flameW * 0.8, motorBotY + flameH * 0.35,
+                          W/2 + flameW, motorBotY);
         ctx.fillStyle = grad; ctx.fill();
 
-        // Bright white core
-        const coreG = ctx.createLinearGradient(W/2, motorBotY, W/2, motorBotY + flameH * 0.3);
-        coreG.addColorStop(0, 'rgba(255,255,255,0.92)');
+        // White-hot core
+        const coreG = ctx.createLinearGradient(W/2, motorBotY, W/2, motorBotY + flameH * 0.28);
+        coreG.addColorStop(0, 'rgba(255,255,255,0.95)');
         coreG.addColorStop(1, 'rgba(255,255,255,0)');
         ctx.beginPath();
-        ctx.moveTo(W/2 - bw * 0.18, motorBotY);
-        ctx.quadraticCurveTo(W/2, motorBotY + flameH * 0.22, W/2 + bw * 0.18, motorBotY);
+        ctx.moveTo(W/2 - flameW * 0.42, motorBotY);
+        ctx.quadraticCurveTo(W/2, motorBotY + flameH * 0.20, W/2 + flameW * 0.42, motorBotY);
         ctx.fillStyle = coreG; ctx.fill();
+
+        // Mach shock diamonds (3 oblate bright rings in core)
+        for (let d = 0; d < 3; d++) {
+            const dy  = motorBotY + flameH * (0.07 + d * 0.11);
+            const dw  = flameW * (0.40 - d * 0.09);
+            const dh  = flameH * 0.030;
+            ctx.globalAlpha = 0.75 - d * 0.22;
+            const dg = ctx.createRadialGradient(W/2, dy, 0, W/2, dy, dw);
+            dg.addColorStop(0,   'rgba(255,255,255,0.95)');
+            dg.addColorStop(0.4, 'rgba(255,240,160,0.7)');
+            dg.addColorStop(1,   'rgba(255,200,80,0)');
+            ctx.fillStyle = dg;
+            ctx.beginPath();
+            ctx.ellipse(W/2, dy, dw, dh, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1;
     }
 
     // ── Rocket ──
@@ -1381,7 +1410,7 @@ function goLaunch() {
             el.textContent = n--;
             setTimeout(tick, 900);
         } else {
-            el.style.cssText = 'display:block;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font:bold 72px Courier New,monospace;color:#fff;text-shadow:0 0 80px #ff8800,0 0 160px #ff4400;pointer-events:none;letter-spacing:4px;';
+            el.style.cssText = 'display:block;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font:bold 76px/1 Courier New,monospace;color:#fff;letter-spacing:8px;text-shadow:0 0 12px #fff,0 0 45px #ffcc00,0 0 90px #ff6600,0 0 180px #ff2200;pointer-events:none;';
             el.textContent = 'IGNITION!';
             if (SIM) SIM.phase = 'powered';
             setTimeout(() => { el.style.display = 'none'; }, 800);
