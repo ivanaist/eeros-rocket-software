@@ -193,9 +193,47 @@
         .btn-sec  { background: transparent; border: 1px solid var(--border); color: var(--dim); padding: 10px 22px; font: 11px/1 'Courier New', monospace; letter-spacing: 2px; cursor: pointer; }
         .btn-sec:hover { border-color: var(--dim); color: var(--text); }
 
+        /* ── SAVE DESIGN ── */
+        .save-rocket-btn {
+            width: 100%; margin-top: 10px;
+            background: transparent; border: 1px solid var(--border); color: var(--dim);
+            padding: 7px; font: 10px/1 'Courier New', monospace; letter-spacing: 2px;
+            cursor: pointer; transition: all .15s;
+        }
+        .save-rocket-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+        #save-input-row { display: none; margin-top: 8px; }
+        .save-name-inp {
+            width: 100%; background: var(--bg); border: 1px solid var(--accent2);
+            color: var(--text); padding: 6px 8px; font: 12px/1 'Courier New', monospace;
+            outline: none; margin-bottom: 6px;
+        }
+        .save-name-inp:focus { border-color: var(--accent); }
+        .save-action-row { display: flex; gap: 6px; }
+        .save-ok-btn   { flex:1; background:var(--accent2); border:1px solid var(--accent); color:white; padding:6px; font:10px/1 'Courier New',monospace; letter-spacing:2px; cursor:pointer; }
+        .save-ok-btn:hover { background:var(--accent); }
+        .save-no-btn   { background:transparent; border:1px solid var(--border); color:var(--dim); padding:6px 10px; font:10px/1 'Courier New',monospace; cursor:pointer; }
+        .save-no-btn:hover { border-color:var(--dim); color:var(--text); }
+
+        #del-saved-row { display: none; margin-top: 5px; }
+        .del-saved-btn {
+            background: transparent; border: none; color: var(--red);
+            font: 9px/1 'Courier New', monospace; letter-spacing: 1px;
+            cursor: pointer; padding: 2px 0;
+        }
+        .del-saved-btn:hover { text-decoration: underline; }
+        #del-confirm-row { display:none; margin-top:4px; }
+        .del-yes-btn { background:transparent; border:1px solid var(--red); color:var(--red); font:9px/1 'Courier New',monospace; padding:3px 8px; cursor:pointer; margin-right:4px; }
+        .del-yes-btn:hover { background:var(--red); color:white; }
+
         /* Scrollbar */
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        @keyframes cntPulse {
+            0%,100% { opacity:1; transform:translate(-50%,-50%) scale(1); }
+            50%      { opacity:.75; transform:translate(-50%,-50%) scale(1.1); }
+        }
     </style>
 </head>
 <body>
@@ -226,6 +264,14 @@
                         <option value="mosquito">Estes Mosquito</option>
                         <option value="bullpup">Estes Bull Pup</option>
                     </select>
+                    <div id="del-saved-row">
+                        <button class="del-saved-btn" onclick="askDeleteConfirm()">× DELETE THIS SAVED DESIGN</button>
+                        <div id="del-confirm-row">
+                            <span style="font:9px/1 'Courier New',monospace;color:var(--red);letter-spacing:1px;">ARE YOU SURE?</span>
+                            <button class="del-yes-btn" onclick="deleteSavedCurrent()">YES</button>
+                            <button class="del-saved-btn" style="color:var(--dim)" onclick="cancelDelete()">CANCEL</button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="field">
@@ -297,6 +343,15 @@
                 <div class="stat-row"><span class="stat-l">STABILITY</span>     <span class="stat-v" id="s-stab">—</span></div>
                 <div class="stat-row"><span class="stat-l">EST. ALTITUDE</span> <span class="stat-v" id="s-alt">—</span></div>
                 <div class="stat-row"><span class="stat-l">THRUST / WEIGHT</span><span class="stat-v" id="s-tw">—</span></div>
+                <button id="save-rocket-btn" class="save-rocket-btn" onclick="startSavePanel()">★  SAVE THIS DESIGN</button>
+                <div id="save-input-row">
+                    <input id="save-name-inp" class="save-name-inp" placeholder="Name your rocket…" maxlength="30"
+                           onkeydown="if(event.key==='Enter')confirmSave()">
+                    <div class="save-action-row">
+                        <button class="save-ok-btn" onclick="confirmSave()">SAVE</button>
+                        <button class="save-no-btn" onclick="cancelSavePanel()">✕</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -344,6 +399,11 @@
             <span class="hud-lbl">VELOCITY</span>
             <span class="hud-val" id="h-vel">0</span>
             <span class="hud-unit">M / S</span>
+        </div>
+        <div class="hud-item">
+            <span class="hud-lbl">G-FORCE</span>
+            <span class="hud-val" id="h-gforce">1.0</span>
+            <span class="hud-unit">G</span>
         </div>
         <div class="hud-item">
             <span class="hud-lbl">PHASE</span>
@@ -413,9 +473,95 @@ const PRESETS = {
 let R = { name:'Custom', len:43, dia:24, dry:28, nose:'ogive', fins:3, finS:'delta', motorKey:'b6', chute:30 };
 
 // ─────────────────────────────────────────────
+// SAVED ROCKETS  (persisted to localStorage)
+// ─────────────────────────────────────────────
+let savedRockets = {};
+try {
+    const raw = localStorage.getItem('eeros_saved_rockets');
+    if (raw) savedRockets = JSON.parse(raw);
+} catch(e) {}
+
+function refreshSavedDropdown() {
+    const sel = document.getElementById('preset-sel');
+    // Remove any previously injected saved options and their divider
+    for (let i = sel.options.length - 1; i >= 0; i--) {
+        const v = sel.options[i].value;
+        if (v === '__saved_div' || v.startsWith('saved:')) sel.remove(i);
+    }
+    const keys = Object.keys(savedRockets);
+    if (keys.length === 0) return;
+    const div = new Option('── My Saved Rockets ──', '__saved_div');
+    div.disabled = true;
+    sel.add(div);
+    keys.forEach(k => sel.add(new Option('★ ' + k, 'saved:' + k)));
+}
+
+function startSavePanel() {
+    const inp = document.getElementById('save-name-inp');
+    inp.value = R.name === 'Custom' ? 'My Rocket' : R.name;
+    document.getElementById('save-rocket-btn').style.display = 'none';
+    document.getElementById('save-input-row').style.display  = 'block';
+    inp.focus(); inp.select();
+}
+
+function cancelSavePanel() {
+    document.getElementById('save-rocket-btn').style.display = 'block';
+    document.getElementById('save-input-row').style.display  = 'none';
+}
+
+function confirmSave() {
+    const key = document.getElementById('save-name-inp').value.trim().slice(0, 30);
+    if (!key) return;
+    savedRockets[key] = { ...R, name: key };
+    try { localStorage.setItem('eeros_saved_rockets', JSON.stringify(savedRockets)); } catch(e) {}
+    refreshSavedDropdown();
+    cancelSavePanel();
+    document.getElementById('preset-sel').value = 'saved:' + key;
+    updateDelBtn();
+    addMsg('★ Rocket "' + key + '" saved! Find it in the PRESET KIT menu anytime. 🚀', 'bot');
+}
+
+function askDeleteConfirm() {
+    document.getElementById('del-confirm-row').style.display = 'block';
+}
+
+function cancelDelete() {
+    document.getElementById('del-confirm-row').style.display = 'none';
+}
+
+function deleteSavedCurrent() {
+    const val = document.getElementById('preset-sel').value;
+    if (!val.startsWith('saved:')) return;
+    const key = val.replace('saved:', '');
+    delete savedRockets[key];
+    try { localStorage.setItem('eeros_saved_rockets', JSON.stringify(savedRockets)); } catch(e) {}
+    refreshSavedDropdown();
+    document.getElementById('preset-sel').value = 'custom';
+    cancelDelete();
+    updateDelBtn();
+}
+
+function updateDelBtn() {
+    const val = document.getElementById('preset-sel').value;
+    document.getElementById('del-saved-row').style.display =
+        val.startsWith('saved:') ? 'block' : 'none';
+    document.getElementById('del-confirm-row').style.display = 'none';
+}
+
+// ─────────────────────────────────────────────
+// SIMULATION STATE
+// ─────────────────────────────────────────────
+let SIM = null;
+let animId = null;
+let lastT = null;
+let trailDots = [];
+let cntGen = 0;  // incremented each launch to cancel old countdown ticks
+
+// ─────────────────────────────────────────────
 // SCREENS
 // ─────────────────────────────────────────────
 function showScreen(id) {
+    if (animId) { cancelAnimationFrame(animId); animId = null; lastT = null; }
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById('screen-' + id).classList.add('active');
     if (id === 'launch') { setTimeout(sizeLaunchCanvas, 30); }
@@ -426,14 +572,26 @@ function showScreen(id) {
 // BUILDER CONTROLS
 // ─────────────────────────────────────────────
 function loadPreset(key) {
-    if (key === 'custom') return;
-    const p = PRESETS[key];
-    R = { name:p.name, len:p.len, dia:p.dia, dry:p.dry, nose:p.nose, fins:p.fins, finS:p.finS, motorKey:p.motor, chute:p.chute };
+    updateDelBtn();
+    if (key === 'custom' || key === '__saved_div') return;
+
+    let p;
+    if (key.startsWith('saved:')) {
+        p = savedRockets[key.replace('saved:', '')];
+        if (!p) return;
+        // Saved rockets use motorKey; provide motor alias for consistency
+        p = { ...p, motor: p.motorKey };
+    } else {
+        p = PRESETS[key];
+        if (!p) return;
+    }
+
+    R = { name:p.name, len:p.len, dia:p.dia, dry:p.dry, nose:p.nose, fins:p.fins, finS:p.finS, motorKey:p.motor||p.motorKey, chute:p.chute };
     document.getElementById('body-len').value = p.len;
     document.getElementById('body-dia').value = p.dia;
     document.getElementById('nose-sel').value = p.nose;
     document.getElementById('fin-shape').value = p.finS;
-    document.getElementById('motor-sel').value = p.motor;
+    document.getElementById('motor-sel').value = p.motor || p.motorKey;
     document.getElementById('chute').value = p.chute;
     setFins(p.fins, false);
     updateRocket();
@@ -629,90 +787,426 @@ function sizeLaunchCanvas() {
     const cv = document.getElementById('launch-canvas');
     cv.width  = cv.offsetWidth  || window.innerWidth;
     cv.height = cv.offsetHeight || window.innerHeight - 60;
-    drawPad();
 }
 
-function drawPad() {
-    const cv = document.getElementById('launch-canvas');
-    const ctx = cv.getContext('2d');
-    const W = cv.width, H = cv.height;
-
-    // Sky gradient
-    const sky = ctx.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0, '#010208');
-    sky.addColorStop(.65, '#071020');
-    sky.addColorStop(1,  '#101808');
-    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
-
-    // Stars
-    for (let i = 0; i < 100; i++) {
-        const sx = ((Math.sin(i * 137.5 + 1) * .5 + .5)) * W;
-        const sy = ((Math.cos(i * 97.3  + 2) * .5 + .5)) * H * .65;
-        ctx.globalAlpha = .15 + (i % 7) * .08;
-        ctx.fillStyle = 'white';
-        ctx.fillRect(sx, sy, i % 3 === 0 ? 1.5 : 1, i % 3 === 0 ? 1.5 : 1);
-    }
-    ctx.globalAlpha = 1;
-
-    // Ground
-    ctx.fillStyle = '#0e1a08'; ctx.fillRect(0, H - 55, W, 55);
-    ctx.fillStyle = '#1a2a10'; ctx.fillRect(0, H - 55, W, 4);
-
-    // Launch gantry
-    const px = W / 2;
-    const groundY = H - 55;
-    ctx.fillStyle = '#2a2a2a'; ctx.fillRect(px - 45, groundY - 6, 90, 6); // pad
-    ctx.fillStyle = '#383838'; ctx.fillRect(px - 4,  groundY - 32, 8, 26); // tower
-    ctx.fillStyle = '#303030'; ctx.fillRect(px + 6,  groundY - 35, 3, 30); // arm
-
-    // Small rocket on pad
-    drawRocketAt(ctx, px, groundY - 32, 1.4);
-
-    // Instruction text
-    ctx.fillStyle = 'rgba(74,158,255,.7)';
-    ctx.font = '12px Courier New';
-    ctx.textAlign = 'center';
-    ctx.fillText('IGNITION SEQUENCE STARTING…', W / 2, H - 16);
-}
-
-function drawRocketAt(ctx, cx, bottomY, scale) {
+// Draw the rocket at a given bodyBottomY (Y of the bottom of the body tube)
+function drawRocketAt(ctx, cx, bodyBottomY, scale) {
     const bw = Math.max(R.dia * scale * 0.4, 5);
     const bh = R.len * scale * 0.7;
     const nh = bw * 2.4;
     const fh = bw * 1.8;
     const mh = bw * 0.5;
-    const topY = bottomY - bh - nh;
-
-    drawNose (ctx, cx, topY, bw, nh, R.nose);
-    drawBody (ctx, cx, topY + nh, bw, bh);
-    drawFins (ctx, cx, topY + nh + bh, bw, fh, R.fins, R.finS);
+    const topY = bodyBottomY - bh - nh;
+    drawNose (ctx, cx, topY,             bw, nh, R.nose);
+    drawBody (ctx, cx, topY + nh,        bw, bh);
+    drawFins (ctx, cx, topY + nh + bh,   bw, fh, R.fins, R.finS);
     drawMotor(ctx, cx, topY + nh + bh + fh * .5, bw * .45, mh);
 }
 
 // ─────────────────────────────────────────────
-// LAUNCH FLOW (countdown → results)
-// Next step: replace showResults() call with real physics sim
+// PHYSICS ENGINE
+// ─────────────────────────────────────────────
+function startSim() {
+    const M = MOTORS[R.motorKey];
+    SIM = {
+        altitude:  0,
+        velocity:  0,
+        time:      0,
+        phase:     'countdown',
+        propLeft:  M.propMass,
+        delayLeft: M.delay,
+        maxAlt:    0,
+        maxVel:    0,
+        mass:      (R.dry + M.propMass) / 1000,
+        crashed:   false,
+    };
+    trailDots = [];
+}
+
+function physicsStep(dt) {
+    if (SIM.phase === 'countdown' || SIM.phase === 'landed') return;
+
+    const M = MOTORS[R.motorKey];
+    const bodyRadius = (R.dia / 1000) / 2;
+    const bodyArea   = Math.PI * bodyRadius * bodyRadius;
+
+    // Thrust
+    let thrust = 0;
+    if (SIM.phase === 'powered') {
+        thrust = M.avgThrust;
+        SIM.propLeft -= (M.propMass / M.burn) * dt;
+        SIM.mass = (R.dry + Math.max(0, SIM.propLeft)) / 1000;
+        if (SIM.propLeft <= 0) {
+            SIM.propLeft = 0;
+            SIM.mass     = R.dry / 1000;
+            SIM.phase    = 'coast';
+            SIM.delayLeft = M.delay;
+        }
+    }
+
+    // Delay: wait for ejection charge
+    if (SIM.phase === 'coast') {
+        SIM.delayLeft -= dt;
+        if (SIM.delayLeft <= 0 || SIM.velocity <= 0) {
+            SIM.phase = 'ejection';
+        }
+    }
+    if (SIM.phase === 'ejection') {
+        SIM.phase = 'descent';
+    }
+
+    // Drag
+    let cd, area;
+    if (SIM.phase === 'descent') {
+        const chuteR = (R.chute / 100) / 2;
+        cd   = 1.5;
+        area = Math.PI * chuteR * chuteR;
+    } else {
+        cd   = 0.5;
+        area = bodyArea;
+    }
+
+    const v      = SIM.velocity;
+    const dragF  = 0.5 * cd * 1.225 * area * v * Math.abs(v);
+    const accel  = (thrust - dragF) / SIM.mass - 9.81;
+
+    SIM.velocity += accel * dt;
+    SIM.altitude += SIM.velocity * dt;
+    SIM.time     += dt;
+
+    if (SIM.altitude > SIM.maxAlt) SIM.maxAlt = SIM.altitude;
+    if (Math.abs(SIM.velocity) > SIM.maxVel) SIM.maxVel = Math.abs(SIM.velocity);
+
+    // Landed?
+    if (SIM.altitude <= 0 && (SIM.phase === 'descent')) {
+        SIM.altitude = 0;
+        SIM.velocity = 0;
+        SIM.phase    = 'landed';
+    }
+}
+
+// ─────────────────────────────────────────────
+// LAUNCH ANIMATION LOOP
+// ─────────────────────────────────────────────
+function animLoop(ts) {
+    if (ts !== null && lastT !== null) {
+        const dt = Math.min((ts - lastT) / 1000, 0.05);
+        physicsStep(dt);
+        renderFrame();
+        updateHUD();
+        if (SIM.phase === 'landed') {
+            setTimeout(showResults, 1200);
+            return;
+        }
+    }
+    lastT  = ts;
+    animId = requestAnimationFrame(animLoop);
+}
+
+function renderFrame() {
+    const cv = document.getElementById('launch-canvas');
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    if (!W || !H) return;
+
+    const alt   = SIM ? SIM.altitude : 0;
+    const phase = SIM ? SIM.phase    : 'countdown';
+    const SCALE = 1.8;
+
+    // ── Rocket geometry (precompute) ──
+    const bw = Math.max(R.dia * SCALE * 0.4, 5);
+    const bh = R.len * SCALE * 0.7;
+    const nh = bw * 2.4;
+    const fh = bw * 1.8;
+    const mh = bw * 0.5;
+    const rocketTotalH = nh + bh + fh * 0.5 + mh;
+
+    // ── Rocket screen position ──
+    // Rocket rises from launchpad (H*0.78) to cruise height (H*0.55) over first 80m
+    const launchBodyY = H * 0.78;
+    const cruiseBodyY = H * 0.55;
+    const ramp = Math.min(alt / 80, 1);
+    const bodyBottomY = launchBodyY - ramp * (launchBodyY - cruiseBodyY);
+    const noseTipY    = bodyBottomY - bh - nh;
+    const motorBotY   = bodyBottomY + fh * 0.5 + mh;
+
+    // ── Ground Y ──
+    // Ground stays near launchpad at start, scrolls down as rocket climbs
+    const groundY = launchBodyY + 14 + alt * 0.18;
+
+    // ── Sky gradient (realistic — darker at zenith, lighter at horizon) ──
+    const tf = Math.min(alt / 2500, 1);
+    const topR = Math.round(10  * (1 - tf));
+    const topG = Math.round(28  * (1 - tf));
+    const topB = Math.round(90  * (1 - tf) + 6);
+    const horR = Math.round(55  * (1 - tf) + 8);
+    const horG = Math.round(100 * (1 - tf) + 8);
+    const horB = Math.round(160 * (1 - tf) + 15);
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
+    skyGrad.addColorStop(0,    `rgb(${topR},${topG},${topB})`);
+    skyGrad.addColorStop(0.55, `rgb(${Math.round((topR+horR)/2)},${Math.round((topG+horG)/2)},${Math.round((topB+horB)/2)})`);
+    skyGrad.addColorStop(1,    `rgb(${horR},${horG},${horB})`);
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    // ── Stars (fade in above 400m) ──
+    const starA = Math.min(Math.max((alt - 300) / 500, 0), 1);
+    if (starA > 0) {
+        for (let i = 0; i < 110; i++) {
+            const sx = ((Math.sin(i * 137.5 + 1) * .5 + .5)) * W;
+            const sy = ((Math.cos(i * 97.3  + 2) * .5 + .5)) * H * .72;
+            ctx.globalAlpha = starA * (.12 + (i % 7) * .07);
+            ctx.fillStyle = 'white';
+            ctx.fillRect(sx, sy, i % 5 === 0 ? 1.8 : 1, i % 5 === 0 ? 1.8 : 1);
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    // ── Clouds (fade out above 1200m, scroll down as rocket climbs) ──
+    const cloudFade = Math.max(0, 1 - alt / 1200);
+    if (cloudFade > 0.04) {
+        const scrollY = alt * 0.12;
+        const clouds = [
+            {cx:0.18, cy:0.38, r1:72, r2:24},
+            {cx:0.70, cy:0.28, r1:88, r2:30},
+            {cx:0.85, cy:0.52, r1:55, r2:20},
+            {cx:0.42, cy:0.68, r1:46, r2:18},
+        ];
+        ctx.fillStyle = 'rgba(210,222,240,1)';
+        for (const c of clouds) {
+            const cy = c.cy * H + scrollY;
+            if (cy > H + 40 || cy < -40) continue;
+            ctx.globalAlpha = cloudFade * 0.58;
+            ctx.beginPath(); ctx.ellipse(c.cx*W,           cy,           c.r1,      c.r2,      0, 0, Math.PI*2); ctx.fill();
+            ctx.globalAlpha = cloudFade * 0.50;
+            ctx.beginPath(); ctx.ellipse(c.cx*W - c.r1*.42, cy + c.r2*.2, c.r1*.65, c.r2*.9,  0, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(c.cx*W + c.r1*.46, cy + c.r2*.15,c.r1*.55, c.r2*.85, 0, 0, Math.PI*2); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    // ── Ground & launchpad ──
+    if (groundY < H + 60) {
+        ctx.fillStyle = '#0e1a08';
+        ctx.fillRect(0, groundY, W, H - groundY + 10);
+        ctx.fillStyle = '#1a2a10';
+        ctx.fillRect(0, groundY, W, 3);
+
+        const px = W / 2;
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(px - 44, groundY - 5, 88, 5);    // launch pad
+        ctx.fillStyle = '#383838';
+        ctx.fillRect(px - 3, groundY - 28, 6, 23);    // tower base
+        ctx.fillStyle = '#303030';
+        ctx.fillRect(px + 5, groundY - 32, 3, 27);    // arm
+    }
+
+    // ── Speed lines (appear above 25 m/s) ──
+    if (SIM && Math.abs(SIM.velocity) > 25 && phase !== 'descent') {
+        const lineA = Math.min((Math.abs(SIM.velocity) - 25) / 60, 0.3);
+        ctx.globalAlpha = lineA;
+        ctx.strokeStyle = 'rgba(150,200,255,1)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 14; i++) {
+            const lx = W * 0.05 + (i / 13) * W * 0.9;
+            const ly = bodyBottomY + 30 + (i % 4) * 14;
+            const len = 25 + (i % 5) * 12;
+            ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx, ly + len); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    // ── Smoke trail (gray puffs that expand and drift) ──
+    if (SIM && phase === 'powered' && Math.random() < 0.45) {
+        trailDots.push({
+            x: W / 2 + (Math.random() - 0.5) * bw * 0.6,
+            y: motorBotY + Math.random() * 4,
+            opacity: 0.52,
+            r: 3 + Math.random() * 2,
+            vy: 22 + Math.random() * 28,
+            vx: (Math.random() - 0.5) * 6,
+        });
+    }
+    const lastDt = (SIM && SIM.time > 0) ? 0.016 : 0;
+    trailDots = trailDots.filter(d => {
+        d.y       += d.vy  * lastDt;
+        d.x       += d.vx  * lastDt;
+        d.opacity -= lastDt * 0.85;
+        d.r       += lastDt * 14;   // puffs expand as they cool
+        if (d.opacity > 0) {
+            ctx.globalAlpha = d.opacity * 0.8;
+            ctx.fillStyle = `rgb(170,185,200)`;
+            ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2); ctx.fill();
+            return true;
+        }
+        return false;
+    });
+    ctx.globalAlpha = 1;
+
+    // ── Flame (larger, more dramatic, with glow ring) ──
+    if (phase === 'powered') {
+        const flicker = 0.82 + Math.random() * 0.36;
+        const flameH  = bw * 5.0 * flicker;
+
+        // Outer orange glow halo
+        ctx.globalAlpha = 0.16;
+        ctx.fillStyle = '#ff5500';
+        ctx.beginPath();
+        ctx.ellipse(W/2, motorBotY + flameH * 0.3, bw * 2.8, flameH * 0.52, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        // Main flame shape
+        const grad = ctx.createLinearGradient(W/2, motorBotY, W/2, motorBotY + flameH);
+        grad.addColorStop(0,    'rgba(255,255,255,0.98)');
+        grad.addColorStop(0.10, 'rgba(255,240,120,0.96)');
+        grad.addColorStop(0.38, 'rgba(255,100,15,0.88)');
+        grad.addColorStop(0.70, 'rgba(255,30,0,0.55)');
+        grad.addColorStop(1,    'rgba(200,0,0,0)');
+        ctx.beginPath();
+        ctx.moveTo(W/2 - bw * 0.44, motorBotY);
+        ctx.quadraticCurveTo(W/2 - bw * 0.12, motorBotY + flameH * 0.52, W/2, motorBotY + flameH);
+        ctx.quadraticCurveTo(W/2 + bw * 0.12, motorBotY + flameH * 0.52, W/2 + bw * 0.44, motorBotY);
+        ctx.fillStyle = grad; ctx.fill();
+
+        // Bright white core
+        const coreG = ctx.createLinearGradient(W/2, motorBotY, W/2, motorBotY + flameH * 0.3);
+        coreG.addColorStop(0, 'rgba(255,255,255,0.92)');
+        coreG.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.beginPath();
+        ctx.moveTo(W/2 - bw * 0.18, motorBotY);
+        ctx.quadraticCurveTo(W/2, motorBotY + flameH * 0.22, W/2 + bw * 0.18, motorBotY);
+        ctx.fillStyle = coreG; ctx.fill();
+    }
+
+    // ── Rocket ──
+    drawRocketAt(ctx, W / 2, bodyBottomY, SCALE);
+
+    // ── Altitude gauge (right side) ──
+    if (SIM && SIM.phase !== 'countdown') {
+        const gx  = W - 18;
+        const gh  = H * 0.72;
+        const gy  = H * 0.13;
+        const mxA = Math.max(SIM.maxAlt * 1.25, 100);
+        const cur = Math.min(SIM.altitude / mxA, 1);
+        const mx  = Math.min(SIM.maxAlt  / mxA, 1);
+
+        // Track
+        ctx.strokeStyle = 'rgba(74,158,255,0.15)';
+        ctx.lineWidth = 9; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(gx, gy + gh); ctx.lineTo(gx, gy); ctx.stroke();
+
+        // Fill
+        ctx.strokeStyle = 'rgba(74,158,255,0.7)';
+        ctx.lineWidth = 9;
+        ctx.beginPath(); ctx.moveTo(gx, gy + gh); ctx.lineTo(gx, gy + gh * (1 - cur)); ctx.stroke();
+
+        // Max-altitude tick (yellow)
+        if (SIM.maxAlt > 0) {
+            const my = gy + gh * (1 - mx);
+            ctx.strokeStyle = 'rgba(251,191,36,0.9)'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(gx - 7, my); ctx.lineTo(gx + 5, my); ctx.stroke();
+            ctx.fillStyle = 'rgba(251,191,36,0.85)';
+            ctx.font = '9px Courier New'; ctx.textAlign = 'right';
+            ctx.fillText(Math.round(SIM.maxAlt) + 'm', gx - 9, my + 3);
+        }
+
+        // ALT label
+        ctx.fillStyle = 'rgba(74,158,255,0.45)';
+        ctx.font = '8px Courier New'; ctx.textAlign = 'center';
+        ctx.fillText('ALT', gx, gy - 5);
+        ctx.textAlign = 'left';
+    }
+
+    // ── Parachute ──
+    if (phase === 'descent' || phase === 'ejection') {
+        const pr = Math.min(R.chute * 0.55, 70); // visual radius
+        ctx.beginPath();
+        ctx.arc(W / 2, noseTipY - pr * 0.6, pr, Math.PI, 0);
+        ctx.fillStyle = 'rgba(220,50,50,0.85)';
+        ctx.fill();
+        ctx.strokeStyle = '#8b1010'; ctx.lineWidth = 1; ctx.stroke();
+        // Shroud lines
+        ctx.strokeStyle = 'rgba(200,200,200,0.45)'; ctx.lineWidth = 0.8;
+        for (let i = -2; i <= 2; i++) {
+            ctx.beginPath();
+            ctx.moveTo(W/2 + (i/2) * pr, noseTipY - pr * 0.6);
+            ctx.lineTo(W/2, noseTipY);
+            ctx.stroke();
+        }
+    }
+
+    // ── Status text ──
+    if (phase === 'countdown') {
+        ctx.fillStyle = 'rgba(74,158,255,.65)';
+        ctx.font = '12px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText('IGNITION SEQUENCE STARTING…', W / 2, H - 16);
+    }
+}
+
+function updateHUD() {
+    if (!SIM) return;
+    document.getElementById('h-alt').textContent  = Math.max(0, Math.round(SIM.altitude));
+    document.getElementById('h-vel').textContent  = Math.abs(SIM.velocity).toFixed(1);
+    document.getElementById('h-time').textContent = SIM.time.toFixed(1);
+
+    // G-force: thrust/mass (in units of g), minus 1g gravity when not in freefall
+    const M = MOTORS[R.motorKey];
+    let gf;
+    if (SIM.phase === 'powered') {
+        gf = (M.avgThrust / SIM.mass / 9.81).toFixed(1);
+    } else if (SIM.phase === 'coast' || SIM.phase === 'ejection') {
+        gf = '0.0'; // weightless (free fall, no thrust)
+    } else if (SIM.phase === 'descent') {
+        const chuteR = (R.chute / 100) / 2;
+        const drag = 0.5 * 1.5 * 1.225 * Math.PI * chuteR * chuteR * SIM.velocity * Math.abs(SIM.velocity);
+        gf = Math.abs(drag / SIM.mass / 9.81).toFixed(1);
+    } else {
+        gf = '1.0';
+    }
+    document.getElementById('h-gforce').textContent = gf;
+
+    const labels = {
+        countdown:'COUNTDOWN', powered:'POWERED 🔥',
+        coast:'COASTING', ejection:'EJECT! 🪂',
+        descent:'DESCENT 🪂', landed:'LANDED',
+    };
+    document.getElementById('h-phase').textContent = labels[SIM.phase] || SIM.phase;
+}
+
+// ─────────────────────────────────────────────
+// LAUNCH FLOW
 // ─────────────────────────────────────────────
 function goLaunch() {
     showScreen('launch');
+    startSim();
+    lastT = null;
+
+    // Start animation loop immediately (shows launchpad during countdown)
+    animId = requestAnimationFrame(animLoop);
+
+    // Countdown (colors shift: 5,4 blue → 3 yellow → 2 orange → 1 red → IGNITION white)
+    // cntGen prevents old countdown ticks from firing after a new launch is triggered
+    cntGen++;
+    const myGen = cntGen;
     let n = 5;
     const el = document.getElementById('countdown');
-    el.style.cssText = 'display:block; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font:bold 90px Courier New,monospace; color:#4a9eff; text-shadow:0 0 50px #4a9eff; pointer-events:none;';
     document.getElementById('h-phase').textContent = 'COUNTDOWN';
 
+    const cntColors = {5:'#4a9eff',4:'#4a9eff',3:'#fbbf24',2:'#f97316',1:'#ef4444'};
     const tick = () => {
+        if (myGen !== cntGen) { el.style.display = 'none'; return; }  // cancelled
         if (n > 0) {
+            const col = cntColors[n] || '#4a9eff';
+            el.style.cssText = `display:block;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font:bold 90px Courier New,monospace;color:${col};text-shadow:0 0 60px ${col};pointer-events:none;animation:cntPulse 0.9s ease-in-out infinite;`;
             el.textContent = n--;
             setTimeout(tick, 900);
         } else {
+            el.style.cssText = 'display:block;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font:bold 72px Courier New,monospace;color:#fff;text-shadow:0 0 80px #ff8800,0 0 160px #ff4400;pointer-events:none;letter-spacing:4px;';
             el.textContent = 'IGNITION!';
-            document.getElementById('h-phase').textContent = 'POWERED';
-            setTimeout(() => {
-                el.style.display = 'none';
-                // ← NEXT STEP: add real physics animation here
-                // For now: jump to results after short wait
-                setTimeout(showResults, 1500);
-            }, 700);
+            if (SIM) SIM.phase = 'powered';
+            setTimeout(() => { el.style.display = 'none'; }, 800);
         }
     };
     tick();
@@ -723,13 +1217,11 @@ function goLaunch() {
 // ─────────────────────────────────────────────
 function showResults() {
     const M   = MOTORS[R.motorKey];
-    const alt = estAlt();
-    const vel = Math.round((M.avgThrust / ((R.dry + M.propMass) / 1000)) * M.burn * 0.55);
-    const t   = (M.burn + M.delay + 3.5).toFixed(1);
+    const alt = Math.max(0, Math.round(SIM ? SIM.maxAlt : estAlt()));
 
     document.getElementById('res-alt').textContent   = alt;
-    document.getElementById('res-time').textContent  = t + ' s';
-    document.getElementById('res-vel').textContent   = vel + ' m/s';
+    document.getElementById('res-time').textContent  = (SIM ? SIM.time : 0).toFixed(1) + ' s';
+    document.getElementById('res-vel').textContent   = Math.round(SIM ? SIM.maxVel : 0) + ' m/s';
     document.getElementById('res-motor').textContent = M.name;
     document.getElementById('res-name').textContent  = R.name.replace('Estes ','');
 
@@ -737,10 +1229,10 @@ function showResults() {
     try { best = parseInt(localStorage.getItem('eeros_rocket_best') || '0'); } catch(e) {}
     if (alt > best) {
         try { localStorage.setItem('eeros_rocket_best', alt); } catch(e) {}
-        document.getElementById('res-best').textContent = '★  NEW PERSONAL BEST!';
+        document.getElementById('res-best').textContent  = '★  NEW PERSONAL BEST!';
         document.getElementById('res-title').textContent = 'MISSION COMPLETE — NEW RECORD!';
     } else {
-        document.getElementById('res-best').textContent = 'PERSONAL BEST: ' + best + ' m';
+        document.getElementById('res-best').textContent  = 'PERSONAL BEST: ' + best + ' m';
         document.getElementById('res-title').textContent = 'MISSION COMPLETE';
     }
     showScreen('results');
@@ -814,6 +1306,7 @@ window.addEventListener('resize', () => {
 
 sizeBuilderCanvas();
 updateRocket();
+refreshSavedDropdown();
 </script>
 </body>
 </html>
