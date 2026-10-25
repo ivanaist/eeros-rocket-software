@@ -733,9 +733,10 @@ function showResults() {
     document.getElementById('res-motor').textContent = M.name;
     document.getElementById('res-name').textContent  = R.name.replace('Estes ','');
 
-    const best = parseInt(localStorage.getItem('eeros_rocket_best') || '0');
+    let best = 0;
+    try { best = parseInt(localStorage.getItem('eeros_rocket_best') || '0'); } catch(e) {}
     if (alt > best) {
-        localStorage.setItem('eeros_rocket_best', alt);
+        try { localStorage.setItem('eeros_rocket_best', alt); } catch(e) {}
         document.getElementById('res-best').textContent = '★  NEW PERSONAL BEST!';
         document.getElementById('res-title').textContent = 'MISSION COMPLETE — NEW RECORD!';
     } else {
