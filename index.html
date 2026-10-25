@@ -108,27 +108,6 @@
         }
         #rocket-canvas { flex: 1; display: block; width: 100%; }
 
-        /* ── CHAT PANEL ── */
-        .chat-panel { width: 240px; min-width: 240px; border-left: 1px solid var(--border); }
-        .chat-msgs  { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 9px; }
-
-        .msg { font-size: 12px; line-height: 1.5; padding: 8px 10px; border-radius: 2px; }
-        .msg.bot  { background: rgba(74,158,255,.09); border: 1px solid rgba(74,158,255,.2); align-self: flex-start; max-width: 96%; }
-        .msg.user { background: rgba(255,255,255,.05); border: 1px solid var(--border); color: var(--dim); align-self: flex-end; max-width: 92%; }
-        .msg-who  { font: 9px/1 'Courier New', monospace; letter-spacing: 1px; color: var(--dim); margin-bottom: 4px; }
-
-        .chat-foot { border-top: 1px solid var(--border); padding: 9px; display: flex; gap: 6px; flex-shrink: 0; }
-        .chat-in {
-            flex: 1; background: var(--bg); border: 1px solid var(--border);
-            color: var(--text); padding: 6px 9px; font-size: 12px; outline: none; border-radius: 2px;
-        }
-        .chat-in:focus { border-color: var(--accent2); }
-        .chat-in::placeholder { color: var(--dim); }
-        .send-btn {
-            background: var(--accent2); border: none; color: white;
-            padding: 6px 11px; font: 11px/1 'Courier New', monospace; cursor: pointer; border-radius: 2px;
-        }
-        .send-btn:hover { background: var(--accent); }
 
         /* ── BOTTOM BAR ── */
         .bottom-bar {
@@ -406,22 +385,6 @@
             <canvas id="rocket-canvas"></canvas>
         </div>
 
-        <!-- RIGHT: Chat -->
-        <div class="panel chat-panel">
-            <div class="panel-title">ROCKET ASSISTANT</div>
-            <div class="chat-msgs" id="chat-msgs">
-                <div class="msg bot">
-                    <div class="msg-who">ASSISTANT</div>
-                    Hi Eero! I know everything about model rockets! 🚀<br><br>
-                    Pick a preset kit to get started, or build your own. Ask me anything — like <em>"how do I go higher?"</em> or <em>"what do fins do?"</em>
-                </div>
-            </div>
-            <div class="chat-foot">
-                <input class="chat-in" id="chat-in" placeholder="Ask about your rocket…"
-                    onkeydown="if(event.key==='Enter') sendChat()">
-                <button class="send-btn" onclick="sendChat()">ASK</button>
-            </div>
-        </div>
 
     </div>
 
@@ -1446,62 +1409,6 @@ function showResults() {
 }
 
 // ─────────────────────────────────────────────
-// ROCKET ASSISTANT CHAT
-// ─────────────────────────────────────────────
-const KB = [
-    { k:['higher','altitude','go up','taller'],
-      r:`To go higher: use a lighter rocket + more powerful motor. A C6-5 instead of B6-4 gives you twice the impulse! Also make sure fins aren't too big — they add drag.` },
-    { k:['fin','fins','stable','stability','tip','wobbly','spin'],
-      r:`Fins keep your rocket flying straight — like feathers on an arrow! If fins are too small → rocket tips and crashes. Bigger fins = more stable, but more drag. Check the STABILITY meter on the left!` },
-    { k:['motor','engine','a8','b6','c6','d12','e12','thrust','power','impulse'],
-      r:`Motor codes: C6-5 means → Class C (10 N·s impulse) · 6 Newton avg thrust · 5 second delay before parachute fires. Bigger letter = more power. B6-4 is great for most rockets!` },
-    { k:['parachute','chute','recover','land','fall','float'],
-      r:`The parachute fires after the delay in the motor code (the last number). Bigger parachute = softer landing. But too big = wind carries it far away! 30 cm is good for most rockets.` },
-    { k:['nose','cone','tip','front'],
-      r:`Ogive nose cones (smooth curve) are the best shape — least air resistance = more altitude. Conical (pointy) is simpler. Parabolic (rounded) is somewhere in between.` },
-    { k:['crash','break','explode','wrong','tip over','fail'],
-      r:`Things go wrong when: (1) fins too small → tips over, (2) motor WAY too powerful → body breaks. Check STABILITY and THRUST/WEIGHT on the left before launching!` },
-    { k:['mass','weight','heavy','light','grams'],
-      r:`Lighter rockets go MUCH higher! As the motor burns, the rocket gets lighter — which actually makes it accelerate faster at the end of the burn. Try smaller motors on tiny light rockets!` },
-    { k:['how high','estimate','predict','altitude'],
-      r:`The EST. ALTITUDE number in the bottom-left is my prediction. It's based on your motor power minus the rocket's weight minus air drag. The real simulation (coming in the next step!) will be even more accurate.` },
-    { k:['hello','hi','hey','helo'],
-      r:`Hey Eero! Ready to break altitude records? 🚀 Pick a preset or build your own. Ask me anything about fins, motors, nose cones, stability — I know it all!` },
-    { k:['estes','alpha','viking','bertha','wizard','mosquito','bullpup'],
-      r:`Estes makes the most popular model rocket kits! Estes Alpha and Viking are great first rockets. Big Bertha is big and flies slowly — very stable. Mosquito is tiny and super fast!` },
-    { k:['what','explain','tell me','help'],
-      r:`I can explain: motors, fins, nose cones, stability, mass, altitude, parachutes, and more! What do you want to know about? Try "what do fins do?" or "which motor is best?"` },
-];
-
-function sendChat() {
-    const inp = document.getElementById('chat-in');
-    const msg = inp.value.trim();
-    if (!msg) return;
-    addMsg(msg, 'user');
-    inp.value = '';
-    setTimeout(() => addMsg(botReply(msg), 'bot'), 380);
-}
-
-function addMsg(text, who) {
-    const box = document.getElementById('chat-msgs');
-    const d = document.createElement('div');
-    d.className = 'msg ' + who;
-    d.innerHTML = `<div class="msg-who">${who === 'bot' ? 'ASSISTANT' : 'EERO'}</div>${text}`;
-    box.appendChild(d);
-    box.scrollTop = box.scrollHeight;
-}
-
-function botReply(msg) {
-    const low = msg.toLowerCase();
-    // Context-aware: warn if unstable
-    if ((low.includes('launch') || low.includes('ready') || low.includes('go')) && stability() !== 'STABLE') {
-        return `⚠️ Your rocket is ${stability()} right now! I'd fix that before launching — try bigger fins or a smaller motor.`;
-    }
-    for (const e of KB) {
-        if (e.k.some(k => low.includes(k))) return e.r;
-    }
-    return `Great question! Try asking about: motors, fins, nose cones, altitude, stability, parachutes, or weight. I know everything about model rockets! 🚀`;
-}
 
 // ─────────────────────────────────────────────
 // INIT
