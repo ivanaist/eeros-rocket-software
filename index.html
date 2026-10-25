@@ -234,12 +234,57 @@
             0%,100% { opacity:1; transform:translate(-50%,-50%) scale(1); }
             50%      { opacity:.75; transform:translate(-50%,-50%) scale(1.1); }
         }
+
+        /* ── START SCREEN ── */
+        #screen-start {
+            align-items:center; justify-content:center;
+            position:relative; background:#000208; overflow:hidden;
+        }
+        #screen-start::after {
+            content:''; position:absolute; inset:0; pointer-events:none; z-index:5;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px);
+        }
+        #start-bg-cv { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:1; }
+        .start-wrap  {
+            position:relative; z-index:10; text-align:center;
+            display:flex; flex-direction:column; align-items:center;
+        }
+        .start-eyebrow { font:10px/1 'Courier New',monospace; letter-spacing:5px; color:var(--dim); margin-bottom:14px; }
+        .start-title  {
+            font:bold 36px/1.15 'Courier New',monospace; letter-spacing:4px;
+            color:var(--accent); text-shadow:0 0 55px rgba(74,158,255,.5); margin-bottom:6px;
+        }
+        .start-sub    { font:11px/1 'Courier New',monospace; letter-spacing:3px; color:var(--dim); margin-bottom:28px; }
+        #start-rocket-cv {
+            display:block; margin-bottom:28px;
+            filter: drop-shadow(0 0 14px rgba(74,158,255,0.28)) drop-shadow(0 0 4px rgba(255,255,255,0.06));
+        }
+        .start-btn {
+            background:transparent; border:1px solid var(--accent); color:var(--accent);
+            padding:13px 62px; font:12px/1 'Courier New',monospace; letter-spacing:5px;
+            cursor:pointer; transition:all .2s; box-shadow:0 0 18px rgba(74,158,255,.22);
+        }
+        .start-btn:hover { background:var(--accent); color:var(--bg); box-shadow:0 0 36px rgba(74,158,255,.65); }
+        .start-credit { margin-top:20px; font:9px/1 'Courier New',monospace; letter-spacing:2px; color:var(--dim); opacity:.4; }
     </style>
 </head>
 <body>
 
+<!-- ═══════════════════ SCREEN 0: START ═══════════════════ -->
+<div id="screen-start" class="screen active">
+    <canvas id="start-bg-cv"></canvas>
+    <div class="start-wrap">
+        <div class="start-eyebrow">MISSION CONTROL — ROCKET DESIGN &amp; SIMULATION</div>
+        <div class="start-title">EERO'S ROCKET<br>SOFTWARE</div>
+        <div class="start-sub">ESTES MODEL ROCKET FLIGHT SIMULATOR</div>
+        <canvas id="start-rocket-cv" width="160" height="210"></canvas>
+        <button class="start-btn" onclick="beginMission()">▲&nbsp; START MISSION</button>
+        <div class="start-credit">BUILT BY EERO · REAL ESTES PHYSICS · REAL ROCKETS</div>
+    </div>
+</div>
+
 <!-- ═══════════════════ SCREEN 1: BUILDER ═══════════════════ -->
-<div id="screen-builder" class="screen active">
+<div id="screen-builder" class="screen">
 
     <div class="header">
         <span class="header-title">EERO'S ROCKET SOFTWARE</span>
@@ -558,14 +603,78 @@ let trailDots = [];
 let cntGen = 0;  // incremented each launch to cancel old countdown ticks
 
 // ─────────────────────────────────────────────
+// START SCREEN
+// ─────────────────────────────────────────────
+let startAnimId = null;
+let _sT = 0;
+
+function sizeStartCanvas() {
+    const cv = document.getElementById('start-bg-cv');
+    cv.width  = window.innerWidth;
+    cv.height = window.innerHeight;
+}
+
+function drawStartRocket() {
+    const cv  = document.getElementById('start-rocket-cv');
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H);
+    const scale = 2.4;
+    const bw = 24 * scale * 0.4;
+    const bh = 43 * scale * 0.7;
+    const nh = bw * 2.4;
+    const fh = bw * 1.8;
+    const mh = bw * 0.5;
+    const totalH = nh + bh + fh * 0.6 + mh;
+    const topY = Math.max(6, (H - totalH) / 2);
+    const cx   = W / 2;
+    drawNose (ctx, cx, topY,                          bw, nh, 'ogive');
+    drawBody (ctx, cx, topY + nh,                     bw, bh);
+    drawFins (ctx, cx, topY + nh + bh,                bw, fh, 3, 'delta');
+    drawMotor(ctx, cx, topY + nh + bh + fh * .55,     bw * .48, mh);
+}
+
+function runStartStars() {
+    const cv = document.getElementById('start-bg-cv');
+    if (!cv || !document.getElementById('screen-start').classList.contains('active')) return;
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    _sT += 0.007;
+    ctx.fillStyle = 'rgba(0,2,8,0.2)';
+    ctx.fillRect(0, 0, W, H);
+    for (let i = 0; i < 210; i++) {
+        const x  = ((Math.sin(i * 137.508) * 0.5 + 0.5) * W + _sT * (i % 3 - 1) * 0.22 + W * 2) % W;
+        const y  = ((Math.cos(i * 97.324)  * 0.5 + 0.5) * H + _sT * 8) % H;
+        const tw = 0.12 + (Math.sin(_sT * 2.1 + i * 0.85) * 0.5 + 0.5) * 0.72;
+        ctx.globalAlpha = tw * (i % 5 === 0 ? 0.88 : 0.32);
+        ctx.fillStyle   = i % 13 === 0 ? '#aac0ff' : 'white';
+        const r = i % 7 === 0 ? 1.5 : 0.85;
+        ctx.fillRect(x, y, r, r);
+    }
+    ctx.globalAlpha = 1;
+    const gg = ctx.createRadialGradient(W / 2, H / 2 + 20, 0, W / 2, H / 2 + 20, 200);
+    gg.addColorStop(0, 'rgba(74,158,255,0.05)');
+    gg.addColorStop(1, 'rgba(74,158,255,0)');
+    ctx.fillStyle = gg; ctx.fillRect(0, 0, W, H);
+    startAnimId = requestAnimationFrame(runStartStars);
+}
+
+function beginMission() {
+    if (startAnimId) { cancelAnimationFrame(startAnimId); startAnimId = null; }
+    showScreen('builder');
+}
+
+// ─────────────────────────────────────────────
 // SCREENS
 // ─────────────────────────────────────────────
 function showScreen(id) {
-    if (animId) { cancelAnimationFrame(animId); animId = null; lastT = null; }
+    if (animId)      { cancelAnimationFrame(animId);      animId = null; lastT = null; }
+    if (startAnimId) { cancelAnimationFrame(startAnimId); startAnimId = null; }
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById('screen-' + id).classList.add('active');
-    if (id === 'launch') { setTimeout(sizeLaunchCanvas, 30); }
+    if (id === 'launch')  { setTimeout(sizeLaunchCanvas, 30); }
     if (id === 'builder') { setTimeout(sizeBuilderCanvas, 30); }
+    if (id === 'start')   { setTimeout(() => { sizeStartCanvas(); drawStartRocket(); runStartStars(); }, 30); }
 }
 
 // ─────────────────────────────────────────────
@@ -712,6 +821,12 @@ function drawBuilder() {
 
 // ── Shape functions ──
 function drawNose(ctx, cx, y, bw, nh, type) {
+    const grad = ctx.createLinearGradient(cx - bw, 0, cx + bw, 0);
+    grad.addColorStop(0,    '#9298a8');
+    grad.addColorStop(0.28, '#d2d6e4');
+    grad.addColorStop(0.50, '#eceef8');
+    grad.addColorStop(0.74, '#c4c8d4');
+    grad.addColorStop(1,    '#888e9e');
     ctx.beginPath();
     if (type === 'conical') {
         ctx.moveTo(cx, y);
@@ -729,22 +844,45 @@ function drawNose(ctx, cx, y, bw, nh, type) {
         ctx.bezierCurveTo(cx - bw, y + nh * .62, cx - bw * .28, y + nh * .25, cx, y);
     }
     ctx.closePath();
-    ctx.fillStyle = '#8a9ab8'; ctx.fill();
-    ctx.strokeStyle = '#4a5a78'; ctx.lineWidth = 1; ctx.stroke();
-    // Highlight
-    ctx.beginPath();
-    ctx.moveTo(cx, y + 2); ctx.lineTo(cx + bw * .22, y + nh * .5);
-    ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = grad; ctx.fill();
+    ctx.strokeStyle = '#70747e'; ctx.lineWidth = 0.8; ctx.stroke();
+    // Specular highlight stripe
+    ctx.globalAlpha = 0.55;
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(cx + bw * .08, y + 2); ctx.lineTo(cx + bw * .26, y + nh * .42); ctx.stroke();
+    ctx.globalAlpha = 1;
 }
 
 function drawBody(ctx, cx, y, bw, bh) {
-    ctx.fillStyle = '#5a6a90'; ctx.fillRect(cx - bw, y, bw * 2, bh);
-    // Highlight strip
-    ctx.fillStyle = 'rgba(255,255,255,.07)'; ctx.fillRect(cx - bw, y, bw * .35, bh);
-    ctx.strokeStyle = '#3a4a68'; ctx.lineWidth = 1; ctx.strokeRect(cx - bw, y, bw * 2, bh);
-    // Center dash
-    ctx.setLineDash([4,5]); ctx.strokeStyle = '#2a3a58'; ctx.lineWidth = .8;
-    ctx.beginPath(); ctx.moveTo(cx, y+4); ctx.lineTo(cx, y+bh-4); ctx.stroke();
+    // Cylindrical shading: dark edges → bright centre
+    const grad = ctx.createLinearGradient(cx - bw, 0, cx + bw, 0);
+    grad.addColorStop(0,    '#8a8e9e');
+    grad.addColorStop(0.16, '#c8ccd8');
+    grad.addColorStop(0.44, '#eceef8');
+    grad.addColorStop(0.58, '#e0e2ee');
+    grad.addColorStop(0.84, '#b4b8c8');
+    grad.addColorStop(1,    '#888898');
+    ctx.fillStyle = grad;
+    ctx.fillRect(cx - bw, y, bw * 2, bh);
+    // Outline
+    ctx.strokeStyle = '#686878'; ctx.lineWidth = 0.8;
+    ctx.strokeRect(cx - bw, y, bw * 2, bh);
+    // Decal band (blue stripe, near nose junction)
+    const bndH = Math.max(3, Math.round(bw * 0.22));
+    const bndY = y + bh * 0.1;
+    const bndGrad = ctx.createLinearGradient(cx - bw, 0, cx + bw, 0);
+    bndGrad.addColorStop(0,   '#2060d0');
+    bndGrad.addColorStop(0.5, '#4a9eff');
+    bndGrad.addColorStop(1,   '#2060d0');
+    ctx.fillStyle = bndGrad;
+    ctx.fillRect(cx - bw, bndY, bw * 2, bndH);
+    ctx.fillStyle = 'rgba(255,255,255,0.32)';
+    ctx.fillRect(cx - bw, bndY, bw * 2, 1);
+    // Subtle seam line
+    ctx.setLineDash([3, 4]);
+    ctx.strokeStyle = 'rgba(0,0,0,0.09)'; ctx.lineWidth = 0.7;
+    ctx.beginPath(); ctx.moveTo(cx, y + 4); ctx.lineTo(cx, y + bh - 4); ctx.stroke();
     ctx.setLineDash([]);
 }
 
@@ -771,13 +909,53 @@ function drawOneFin(ctx, x, y, fw, fh, shape, left) {
         ctx.lineTo(x, y + fh);
     }
     ctx.closePath();
-    ctx.fillStyle = '#b83020'; ctx.fill();
-    ctx.strokeStyle = '#7a1a10'; ctx.lineWidth = 1; ctx.stroke();
+    // Gradient: bright leading edge fades to darker root
+    const finGrad = ctx.createLinearGradient(x, 0, x + d * fw, 0);
+    if (left) {
+        finGrad.addColorStop(0,   '#881c10');
+        finGrad.addColorStop(0.5, '#c02e1e');
+        finGrad.addColorStop(1,   '#d84030');
+    } else {
+        finGrad.addColorStop(0,   '#d84030');
+        finGrad.addColorStop(0.5, '#c02e1e');
+        finGrad.addColorStop(1,   '#881c10');
+    }
+    ctx.fillStyle = finGrad; ctx.fill();
+    ctx.strokeStyle = '#5c100a'; ctx.lineWidth = 0.8; ctx.stroke();
 }
 
 function drawMotor(ctx, cx, y, mw, mh) {
-    ctx.fillStyle = '#2a3245'; ctx.fillRect(cx - mw, y, mw * 2, mh);
-    ctx.strokeStyle = '#1a2235'; ctx.lineWidth = 1; ctx.strokeRect(cx - mw, y, mw * 2, mh);
+    // Casing with metallic gradient
+    const casGrad = ctx.createLinearGradient(cx - mw, 0, cx + mw, 0);
+    casGrad.addColorStop(0,    '#1e1e28');
+    casGrad.addColorStop(0.35, '#3e3e50');
+    casGrad.addColorStop(0.5,  '#505060');
+    casGrad.addColorStop(0.65, '#3e3e50');
+    casGrad.addColorStop(1,    '#1e1e28');
+    ctx.fillStyle = casGrad;
+    ctx.fillRect(cx - mw, y, mw * 2, mh * 0.65);
+    // Nozzle bell (wider at exit)
+    const nw  = mw * 1.25;
+    const ny  = y + mh * 0.5;
+    const nh2 = mh * 0.55;
+    ctx.beginPath();
+    ctx.moveTo(cx - mw * 0.88, ny);
+    ctx.lineTo(cx - nw, ny + nh2);
+    ctx.lineTo(cx + nw, ny + nh2);
+    ctx.lineTo(cx + mw * 0.88, ny);
+    ctx.closePath();
+    const nozGrad = ctx.createLinearGradient(cx - nw, 0, cx + nw, 0);
+    nozGrad.addColorStop(0,   '#141418');
+    nozGrad.addColorStop(0.4, '#383848');
+    nozGrad.addColorStop(0.6, '#383848');
+    nozGrad.addColorStop(1,   '#141418');
+    ctx.fillStyle = nozGrad; ctx.fill();
+    ctx.strokeStyle = '#0e0e14'; ctx.lineWidth = 0.7; ctx.stroke();
+    // Nozzle throat (dark opening)
+    ctx.fillStyle = '#060608';
+    ctx.beginPath();
+    ctx.ellipse(cx, ny + nh2 * 0.88, mw * 0.38, mh * 0.1, 0, 0, Math.PI * 2);
+    ctx.fill();
 }
 
 // ─────────────────────────────────────────────
@@ -1302,11 +1480,14 @@ function botReply(msg) {
 window.addEventListener('resize', () => {
     if (document.getElementById('screen-builder').classList.contains('active')) sizeBuilderCanvas();
     if (document.getElementById('screen-launch').classList.contains('active'))  sizeLaunchCanvas();
+    if (document.getElementById('screen-start').classList.contains('active'))   { sizeStartCanvas(); drawStartRocket(); }
 });
 
-sizeBuilderCanvas();
 updateRocket();
 refreshSavedDropdown();
+sizeStartCanvas();
+drawStartRocket();
+runStartStars();
 </script>
 </body>
 </html>
