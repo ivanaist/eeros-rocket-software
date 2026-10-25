@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eero's Rocket Software</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg:        #080b14;
+            --panel:     #0f1220;
+            --border:    #1e2840;
+            --accent:    #4a9eff;
+            --accent2:   #2a5a9a;
+            --text:      #d0d8f0;
+            --dim:       #6878a0;
+            --green:     #4ade80;
+            --red:       #f87171;
+            --yellow:    #fbbf24;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: system-ui, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── SCREENS ── */
+        .screen { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+        .screen.active { display: flex; }
+
+        /* ── HEADER ── */
+        .header {
+            display: flex; align-items: center; gap: 14px;
+            padding: 11px 20px;
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        .header-title { font: bold 13px/1 'Courier New', monospace; letter-spacing: 3px; color: var(--accent); }
+        .header-tag   { font: 10px/1 'Courier New', monospace; letter-spacing: 1px; color: var(--dim);
+                        border: 1px solid var(--border); padding: 2px 8px; }
+
+        /* ── BUILDER LAYOUT ── */
+        .builder-body { display: flex; flex: 1; overflow: hidden; }
+
+        /* ── PANELS ── */
+        .panel { background: var(--panel); display: flex; flex-direction: column; overflow: hidden; }
+        .panel-title {
+            padding: 9px 14px; font: 10px/1 'Courier New', monospace;
+            letter-spacing: 2px; color: var(--dim);
+            border-bottom: 1px solid var(--border); background: rgba(0,0,0,.25);
+            flex-shrink: 0;
+        }
+
+        /* ── PARTS PANEL ── */
+        .parts-panel { width: 250px; min-width: 250px; border-right: 1px solid var(--border); }
+        .parts-scroll { flex: 1; overflow-y: auto; padding: 14px; }
+
+        .field { margin-bottom: 16px; }
+        .field label { display: block; font: 10px/1 'Courier New', monospace; letter-spacing: 1.5px; color: var(--dim); margin-bottom: 6px; }
+
+        .field select {
+            width: 100%; background: var(--bg); border: 1px solid var(--border);
+            color: var(--text); padding: 7px 9px;
+            font: 12px/1 'Courier New', monospace; outline: none; cursor: pointer;
+        }
+        .field select:hover { border-color: var(--accent2); }
+        .field select option { background: var(--panel); }
+
+        .slider-row { display: flex; align-items: center; gap: 8px; }
+        .slider-val  { font: 12px/1 'Courier New', monospace; color: var(--accent); min-width: 50px; text-align: right; }
+
+        input[type="range"] {
+            -webkit-appearance: none; flex: 1; height: 3px;
+            background: var(--border); border: none; outline: none; cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 13px; height: 13px;
+            background: var(--accent); border-radius: 50%;
+        }
+
+        .fin-btns { display: flex; gap: 8px; }
+        .fin-btn {
+            flex: 1; padding: 7px 4px; background: var(--bg);
+            border: 1px solid var(--border); color: var(--dim);
+            font: 11px/1 'Courier New', monospace; cursor: pointer; text-align: center;
+        }
+        .fin-btn.on { border-color: var(--accent); color: var(--accent); }
+
+        /* Stats bar */
+        .stats-bar { border-top: 1px solid var(--border); padding: 11px 14px; background: rgba(0,0,0,.2); flex-shrink: 0; }
+        .stat-row  { display: flex; justify-content: space-between; margin-bottom: 5px; }
+        .stat-l    { font: 10px/1 'Courier New', monospace; color: var(--dim); }
+        .stat-v    { font: 10px/1 'Courier New', monospace; color: var(--accent); }
+        .stat-v.warn   { color: var(--yellow); }
+        .stat-v.danger { color: var(--red); }
+
+        /* ── PREVIEW PANEL ── */
+        .preview-panel {
+            flex: 1; display: flex; flex-direction: column; overflow: hidden;
+            background: var(--bg); align-items: stretch;
+        }
+        #rocket-canvas { flex: 1; display: block; width: 100%; }
+
+        /* ── CHAT PANEL ── */
+        .chat-panel { width: 240px; min-width: 240px; border-left: 1px solid var(--border); }
+        .chat-msgs  { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 9px; }
+
+        .msg { font-size: 12px; line-height: 1.5; padding: 8px 10px; border-radius: 2px; }
+        .msg.bot  { background: rgba(74,158,255,.09); border: 1px solid rgba(74,158,255,.2); align-self: flex-start; max-width: 96%; }
+        .msg.user { background: rgba(255,255,255,.05); border: 1px solid var(--border); color: var(--dim); align-self: flex-end; max-width: 92%; }
+        .msg-who  { font: 9px/1 'Courier New', monospace; letter-spacing: 1px; color: var(--dim); margin-bottom: 4px; }
+
+        .chat-foot { border-top: 1px solid var(--border); padding: 9px; display: flex; gap: 6px; flex-shrink: 0; }
+        .chat-in {
+            flex: 1; background: var(--bg); border: 1px solid var(--border);
+            color: var(--text); padding: 6px 9px; font-size: 12px; outline: none; border-radius: 2px;
+        }
+        .chat-in:focus { border-color: var(--accent2); }
+        .chat-in::placeholder { color: var(--dim); }
+        .send-btn {
+            background: var(--accent2); border: none; color: white;
+            padding: 6px 11px; font: 11px/1 'Courier New', monospace; cursor: pointer; border-radius: 2px;
+        }
+        .send-btn:hover { background: var(--accent); }
+
+        /* ── BOTTOM BAR ── */
+        .bottom-bar {
+            padding: 11px 20px; background: var(--panel);
+            border-top: 1px solid var(--border); display: flex; justify-content: center; flex-shrink: 0;
+        }
+        .launch-btn {
+            background: transparent; border: 1px solid var(--accent); color: var(--accent);
+            padding: 10px 60px; font: 13px/1 'Courier New', monospace;
+            letter-spacing: 4px; cursor: pointer; transition: all .15s;
+        }
+        .launch-btn:hover { background: var(--accent); color: var(--bg); }
+
+        /* ── LAUNCH SCREEN ── */
+        #screen-launch { position: relative; background: #010208; }
+        #launch-canvas { flex: 1; display: block; width: 100%; }
+
+        .hud {
+            position: absolute; top: 0; left: 0; right: 0;
+            display: flex; gap: 28px; padding: 13px 20px;
+            background: rgba(8,11,20,.8); border-bottom: 1px solid var(--border);
+        }
+        .hud-item { display: flex; flex-direction: column; }
+        .hud-lbl  { font: 9px/1 'Courier New', monospace; letter-spacing: 2px; color: var(--dim); margin-bottom: 3px; }
+        .hud-val  { font: bold 20px/1 'Courier New', monospace; color: var(--green); }
+        .hud-unit { font: 10px/1 'Courier New', monospace; color: var(--dim); margin-top: 2px; }
+
+        #countdown {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+            font: bold 90px/1 'Courier New', monospace; color: var(--accent);
+            text-shadow: 0 0 50px var(--accent); display: none; pointer-events: none;
+        }
+
+        .back-btn {
+            position: absolute; bottom: 18px; left: 18px;
+            background: transparent; border: 1px solid var(--border); color: var(--dim);
+            padding: 7px 14px; font: 11px/1 'Courier New', monospace; cursor: pointer; letter-spacing: 1px;
+        }
+        .back-btn:hover { border-color: var(--dim); color: var(--text); }
+
+        /* ── RESULTS SCREEN ── */
+        #screen-results { align-items: center; justify-content: center; }
+
+        .results-box {
+            border: 1px solid var(--border); background: var(--panel);
+            padding: 36px 52px; text-align: center; min-width: 400px;
+        }
+        .res-label { font: 11px/1 'Courier New', monospace; letter-spacing: 4px; color: var(--dim); margin-bottom: 24px; }
+        .res-big   { font: bold 68px/1 'Courier New', monospace; color: var(--green); }
+        .res-unit  { font: 14px/1 'Courier New', monospace; color: var(--dim); margin-bottom: 26px; }
+
+        .res-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 22px; text-align: left; }
+        .res-cell { padding: 11px; background: rgba(0,0,0,.3); border: 1px solid var(--border); }
+        .res-cell-lbl { font: 9px/1 'Courier New', monospace; letter-spacing: 2px; color: var(--dim); margin-bottom: 5px; }
+        .res-cell-val { font: 17px/1 'Courier New', monospace; color: var(--text); }
+
+        .res-best { font: 11px/1 'Courier New', monospace; color: var(--yellow); letter-spacing: 1px; margin-bottom: 26px; }
+
+        .res-btns { display: flex; gap: 10px; justify-content: center; }
+        .btn-main { background: var(--accent2); border: 1px solid var(--accent); color: var(--text); padding: 10px 22px; font: 11px/1 'Courier New', monospace; letter-spacing: 2px; cursor: pointer; }
+        .btn-main:hover { background: var(--accent); }
+        .btn-sec  { background: transparent; border: 1px solid var(--border); color: var(--dim); padding: 10px 22px; font: 11px/1 'Courier New', monospace; letter-spacing: 2px; cursor: pointer; }
+        .btn-sec:hover { border-color: var(--dim); color: var(--text); }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    </style>
+</head>
+<body>
+
+<!-- ═══════════════════ SCREEN 1: BUILDER ═══════════════════ -->
+<div id="screen-builder" class="screen active">
+
+    <div class="header">
+        <span class="header-title">EERO'S ROCKET SOFTWARE</span>
+        <span class="header-tag">DESIGN LAB</span>
+    </div>
+
+    <div class="builder-body">
+
+        <!-- LEFT: Parts -->
+        <div class="panel parts-panel">
+            <div class="panel-title">ROCKET CONFIGURATION</div>
+            <div class="parts-scroll">
+
+                <div class="field">
+                    <label>PRESET KIT</label>
+                    <select id="preset-sel" onchange="loadPreset(this.value)">
+                        <option value="custom">— Build My Own —</option>
+                        <option value="alpha">Estes Alpha</option>
+                        <option value="viking">Estes Viking</option>
+                        <option value="bigbertha">Estes Big Bertha</option>
+                        <option value="wizard">Estes Wizard</option>
+                        <option value="mosquito">Estes Mosquito</option>
+                        <option value="bullpup">Estes Bull Pup</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label>NOSE CONE</label>
+                    <select id="nose-sel" onchange="updateRocket()">
+                        <option value="ogive">Ogive (smooth curve)</option>
+                        <option value="conical">Conical (pointy)</option>
+                        <option value="parabolic">Parabolic (rounded)</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label>BODY LENGTH</label>
+                    <div class="slider-row">
+                        <input type="range" id="body-len" min="20" max="80" value="43" oninput="updateRocket()">
+                        <span class="slider-val" id="body-len-v">43 cm</span>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label>BODY DIAMETER</label>
+                    <div class="slider-row">
+                        <input type="range" id="body-dia" min="13" max="66" value="24" oninput="updateRocket()">
+                        <span class="slider-val" id="body-dia-v">24 mm</span>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label>NUMBER OF FINS</label>
+                    <div class="fin-btns">
+                        <button class="fin-btn on" id="fb3" onclick="setFins(3)">3 FINS</button>
+                        <button class="fin-btn"    id="fb4" onclick="setFins(4)">4 FINS</button>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label>FIN SHAPE</label>
+                    <select id="fin-shape" onchange="updateRocket()">
+                        <option value="delta">Delta</option>
+                        <option value="trap">Trapezoidal</option>
+                        <option value="ellip">Elliptical</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label>MOTOR</label>
+                    <select id="motor-sel" onchange="updateRocket()">
+                        <option value="ha3">½A3-2T &nbsp; (0.6 N·s)</option>
+                        <option value="a8">A8-3 &nbsp;&nbsp;&nbsp; (2.5 N·s)</option>
+                        <option value="b6" selected>B6-4 &nbsp;&nbsp;&nbsp; (5.0 N·s)</option>
+                        <option value="c6">C6-5 &nbsp;&nbsp;&nbsp; (10.0 N·s)</option>
+                        <option value="d12">D12-3 &nbsp;&nbsp; (20.0 N·s)</option>
+                        <option value="e12">E12-4 &nbsp;&nbsp; (40.0 N·s)</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label>PARACHUTE DIAMETER</label>
+                    <div class="slider-row">
+                        <input type="range" id="chute" min="15" max="60" value="30" oninput="updateRocket()">
+                        <span class="slider-val" id="chute-v">30 cm</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="stats-bar">
+                <div class="stat-row"><span class="stat-l">TOTAL MASS</span>    <span class="stat-v" id="s-mass">—</span></div>
+                <div class="stat-row"><span class="stat-l">STABILITY</span>     <span class="stat-v" id="s-stab">—</span></div>
+                <div class="stat-row"><span class="stat-l">EST. ALTITUDE</span> <span class="stat-v" id="s-alt">—</span></div>
+                <div class="stat-row"><span class="stat-l">THRUST / WEIGHT</span><span class="stat-v" id="s-tw">—</span></div>
+            </div>
+        </div>
+
+        <!-- CENTER: Canvas preview -->
+        <div class="panel preview-panel">
+            <div class="panel-title" style="border-bottom:1px solid var(--border)">ROCKET PREVIEW</div>
+            <canvas id="rocket-canvas"></canvas>
+        </div>
+
+        <!-- RIGHT: Chat -->
+        <div class="panel chat-panel">
+            <div class="panel-title">ROCKET ASSISTANT</div>
+            <div class="chat-msgs" id="chat-msgs">
+                <div class="msg bot">
+                    <div class="msg-who">ASSISTANT</div>
+                    Hi Eero! I know everything about model rockets! 🚀<br><br>
+                    Pick a preset kit to get started, or build your own. Ask me anything — like <em>"how do I go higher?"</em> or <em>"what do fins do?"</em>
+                </div>
+            </div>
+            <div class="chat-foot">
+                <input class="chat-in" id="chat-in" placeholder="Ask about your rocket…"
+                    onkeydown="if(event.key==='Enter') sendChat()">
+                <button class="send-btn" onclick="sendChat()">ASK</button>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="bottom-bar">
+        <button class="launch-btn" onclick="goLaunch()">▲ LAUNCH ROCKET</button>
+    </div>
+</div>
+
+
+<!-- ═══════════════════ SCREEN 2: LAUNCH ═══════════════════ -->
+<div id="screen-launch" class="screen">
+
+    <div class="hud">
+        <div class="hud-item">
+            <span class="hud-lbl">ALTITUDE</span>
+            <span class="hud-val" id="h-alt">0</span>
+            <span class="hud-unit">METRES</span>
+        </div>
+        <div class="hud-item">
+            <span class="hud-lbl">VELOCITY</span>
+            <span class="hud-val" id="h-vel">0</span>
+            <span class="hud-unit">M / S</span>
+        </div>
+        <div class="hud-item">
+            <span class="hud-lbl">PHASE</span>
+            <span class="hud-val" id="h-phase" style="font-size:13px;margin-top:5px;">READY</span>
+        </div>
+        <div class="hud-item">
+            <span class="hud-lbl">TIME</span>
+            <span class="hud-val" id="h-time">0.0</span>
+            <span class="hud-unit">SECONDS</span>
+        </div>
+    </div>
+
+    <canvas id="launch-canvas"></canvas>
+    <div id="countdown"></div>
+    <button class="back-btn" onclick="showScreen('builder')">← BACK TO BUILDER</button>
+</div>
+
+
+<!-- ═══════════════════ SCREEN 3: RESULTS ═══════════════════ -->
+<div id="screen-results" class="screen">
+    <div class="results-box">
+        <div class="res-label" id="res-title">MISSION COMPLETE</div>
+
+        <div class="res-big"  id="res-alt">—</div>
+        <div class="res-unit">METRES ALTITUDE</div>
+
+        <div class="res-grid">
+            <div class="res-cell"><div class="res-cell-lbl">FLIGHT TIME</div>  <div class="res-cell-val" id="res-time">—</div></div>
+            <div class="res-cell"><div class="res-cell-lbl">MAX VELOCITY</div> <div class="res-cell-val" id="res-vel">—</div></div>
+            <div class="res-cell"><div class="res-cell-lbl">MOTOR</div>        <div class="res-cell-val" id="res-motor">—</div></div>
+            <div class="res-cell"><div class="res-cell-lbl">ROCKET</div>       <div class="res-cell-val" id="res-name">—</div></div>
+        </div>
+
+        <div class="res-best" id="res-best"></div>
+
+        <div class="res-btns">
+            <button class="btn-main" onclick="goLaunch()">TRY AGAIN</button>
+            <button class="btn-sec"  onclick="showScreen('builder')">CHANGE DESIGN</button>
+        </div>
+    </div>
+</div>
+
+
+<script>
+// ─────────────────────────────────────────────
+// DATA
+// ─────────────────────────────────────────────
+const MOTORS = {
+    ha3: { name:'½A3-2T', impulse:0.6,  avgThrust:3.3,  burn:0.18, delay:2, propMass:1.3  },
+    a8:  { name:'A8-3',   impulse:2.5,  avgThrust:8.0,  burn:0.32, delay:3, propMass:3.1  },
+    b6:  { name:'B6-4',   impulse:5.0,  avgThrust:6.0,  burn:0.85, delay:4, propMass:5.0  },
+    c6:  { name:'C6-5',   impulse:10.0, avgThrust:6.0,  burn:1.9,  delay:5, propMass:11.0 },
+    d12: { name:'D12-3',  impulse:20.0, avgThrust:12.0, burn:1.7,  delay:3, propMass:20.7 },
+    e12: { name:'E12-4',  impulse:40.0, avgThrust:12.0, burn:3.0,  delay:4, propMass:37.0 },
+};
+
+const PRESETS = {
+    alpha:     { name:'Estes Alpha',      len:43, dia:24, dry:28,  nose:'ogive',   fins:3, finS:'delta', motor:'b6',  chute:30 },
+    viking:    { name:'Estes Viking',     len:48, dia:24, dry:31,  nose:'ogive',   fins:3, finS:'delta', motor:'c6',  chute:30 },
+    bigbertha: { name:'Estes Big Bertha', len:69, dia:40, dry:113, nose:'ogive',   fins:3, finS:'trap',  motor:'b6',  chute:45 },
+    wizard:    { name:'Estes Wizard',     len:38, dia:18, dry:22,  nose:'conical', fins:3, finS:'delta', motor:'a8',  chute:25 },
+    mosquito:  { name:'Estes Mosquito',   len:20, dia:13, dry:9,   nose:'conical', fins:3, finS:'delta', motor:'ha3', chute:15 },
+    bullpup:   { name:'Estes Bull Pup',   len:51, dia:28, dry:43,  nose:'parabolic',fins:4,finS:'trap',  motor:'d12', chute:35 },
+};
+
+// Current rocket
+let R = { name:'Custom', len:43, dia:24, dry:28, nose:'ogive', fins:3, finS:'delta', motorKey:'b6', chute:30 };
+
+// ─────────────────────────────────────────────
+// SCREENS
+// ─────────────────────────────────────────────
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-' + id).classList.add('active');
+    if (id === 'launch') { setTimeout(sizeLaunchCanvas, 30); }
+    if (id === 'builder') { setTimeout(sizeBuilderCanvas, 30); }
+}
+
+// ─────────────────────────────────────────────
+// BUILDER CONTROLS
+// ─────────────────────────────────────────────
+function loadPreset(key) {
+    if (key === 'custom') return;
+    const p = PRESETS[key];
+    R = { name:p.name, len:p.len, dia:p.dia, dry:p.dry, nose:p.nose, fins:p.fins, finS:p.finS, motorKey:p.motor, chute:p.chute };
+    document.getElementById('body-len').value = p.len;
+    document.getElementById('body-dia').value = p.dia;
+    document.getElementById('nose-sel').value = p.nose;
+    document.getElementById('fin-shape').value = p.finS;
+    document.getElementById('motor-sel').value = p.motor;
+    document.getElementById('chute').value = p.chute;
+    setFins(p.fins, false);
+    updateRocket();
+}
+
+function setFins(n, doUpdate = true) {
+    R.fins = n;
+    document.getElementById('fb3').classList.toggle('on', n === 3);
+    document.getElementById('fb4').classList.toggle('on', n === 4);
+    if (doUpdate) updateRocket();
+}
+
+function updateRocket() {
+    R.len      = parseInt(document.getElementById('body-len').value);
+    R.dia      = parseInt(document.getElementById('body-dia').value);
+    R.nose     = document.getElementById('nose-sel').value;
+    R.finS     = document.getElementById('fin-shape').value;
+    R.motorKey = document.getElementById('motor-sel').value;
+    R.chute    = parseInt(document.getElementById('chute').value);
+
+    if (document.getElementById('preset-sel').value === 'custom') {
+        R.name = 'Custom';
+        R.dry  = Math.round(12 + R.len * 0.28 + R.dia * 0.15);
+    }
+
+    document.getElementById('body-len-v').textContent = R.len + ' cm';
+    document.getElementById('body-dia-v').textContent = R.dia + ' mm';
+    document.getElementById('chute-v').textContent    = R.chute + ' cm';
+
+    refreshStats();
+    drawBuilder();
+}
+
+function refreshStats() {
+    const M   = MOTORS[R.motorKey];
+    const kg  = (R.dry + M.propMass) / 1000;
+    const tw  = (M.avgThrust / (kg * 9.81)).toFixed(1);
+    const alt = estAlt();
+    const stab = stability();
+
+    document.getElementById('s-mass').textContent = (R.dry + M.propMass).toFixed(0) + ' g';
+    document.getElementById('s-tw').textContent   = tw + ':1';
+    document.getElementById('s-alt').textContent  = '~' + alt + ' m';
+
+    const el = document.getElementById('s-stab');
+    el.textContent = stab;
+    el.className = stab === 'STABLE' ? 'stat-v' : stab === 'MARGINAL' ? 'stat-v warn' : 'stat-v danger';
+}
+
+function stability() {
+    const finArea  = R.fins * (R.dia * 0.5) * (R.dia * 0.3);
+    const bodyArea = R.dia * R.len * 0.1;
+    const r = finArea / bodyArea;
+    return r > 0.55 ? 'STABLE' : r > 0.28 ? 'MARGINAL' : 'UNSTABLE';
+}
+
+function estAlt() {
+    const M   = MOTORS[R.motorKey];
+    const kg  = (R.dry + M.propMass) / 1000;
+    const vBo = (M.avgThrust - kg * 9.81) * M.burn / kg;
+    const hP  = Math.max(0, 0.5 * vBo * M.burn);
+    const hC  = (vBo * vBo) / (2 * 9.81);
+    return Math.max(0, Math.round(hP + hC * 0.65));
+}
+
+// ─────────────────────────────────────────────
+// ROCKET DRAWING (builder canvas)
+// ─────────────────────────────────────────────
+function sizeBuilderCanvas() {
+    const cv  = document.getElementById('rocket-canvas');
+    const par = cv.parentElement;
+    cv.width  = par.clientWidth;
+    cv.height = par.clientHeight - 30; // minus panel-title
+    drawBuilder();
+}
+
+function drawBuilder() {
+    const cv = document.getElementById('rocket-canvas');
+    if (!cv.width) return;
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H);
+
+    // Background grid
+    ctx.strokeStyle = 'rgba(30,40,64,.4)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 30) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    for (let y = 0; y < H; y += 30) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+    // Scale rocket to fit canvas
+    const maxH = H * 0.78;
+    const scale = Math.min(maxH / (R.len + 20), 4.5);
+    const bw = Math.max(R.dia * scale * 0.5, 9);
+    const bh = R.len * scale;
+    const nh = Math.max(bw * 2.4, 18);
+    const fh = Math.max(bw * 2.0, 14);
+    const mh = bw * 0.55;
+    const totalH = nh + bh + fh * 0.6 + mh;
+    const topY = (H - totalH) / 2;
+    const cx = W / 2;
+
+    drawNose (ctx, cx, topY, bw, nh, R.nose);
+    drawBody (ctx, cx, topY + nh, bw, bh);
+    drawFins (ctx, cx, topY + nh + bh, bw, fh, R.fins, R.finS);
+    drawMotor(ctx, cx, topY + nh + bh + fh * 0.55, bw * 0.48, mh);
+
+    // Label: body length
+    ctx.fillStyle = '#3d4a6a';
+    ctx.font = '10px Courier New';
+    ctx.textAlign = 'left';
+    ctx.fillText(R.len + ' cm', cx + bw + 8, topY + nh + bh / 2 + 4);
+
+    // Fin count label
+    ctx.fillStyle = '#3d4a6a';
+    ctx.textAlign = 'center';
+    ctx.fillText(R.fins + ' fins · ' + R.dia + 'mm dia', cx, topY + nh + bh + fh + mh + 14);
+}
+
+// ── Shape functions ──
+function drawNose(ctx, cx, y, bw, nh, type) {
+    ctx.beginPath();
+    if (type === 'conical') {
+        ctx.moveTo(cx, y);
+        ctx.lineTo(cx + bw, y + nh);
+        ctx.lineTo(cx - bw, y + nh);
+    } else if (type === 'parabolic') {
+        ctx.moveTo(cx, y);
+        ctx.quadraticCurveTo(cx + bw * .65, y + nh * .5, cx + bw, y + nh);
+        ctx.lineTo(cx - bw, y + nh);
+        ctx.quadraticCurveTo(cx - bw * .65, y + nh * .5, cx, y);
+    } else { // ogive
+        ctx.moveTo(cx, y);
+        ctx.bezierCurveTo(cx + bw * .28, y + nh * .25, cx + bw, y + nh * .62, cx + bw, y + nh);
+        ctx.lineTo(cx - bw, y + nh);
+        ctx.bezierCurveTo(cx - bw, y + nh * .62, cx - bw * .28, y + nh * .25, cx, y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = '#8a9ab8'; ctx.fill();
+    ctx.strokeStyle = '#4a5a78'; ctx.lineWidth = 1; ctx.stroke();
+    // Highlight
+    ctx.beginPath();
+    ctx.moveTo(cx, y + 2); ctx.lineTo(cx + bw * .22, y + nh * .5);
+    ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.lineWidth = 1.5; ctx.stroke();
+}
+
+function drawBody(ctx, cx, y, bw, bh) {
+    ctx.fillStyle = '#5a6a90'; ctx.fillRect(cx - bw, y, bw * 2, bh);
+    // Highlight strip
+    ctx.fillStyle = 'rgba(255,255,255,.07)'; ctx.fillRect(cx - bw, y, bw * .35, bh);
+    ctx.strokeStyle = '#3a4a68'; ctx.lineWidth = 1; ctx.strokeRect(cx - bw, y, bw * 2, bh);
+    // Center dash
+    ctx.setLineDash([4,5]); ctx.strokeStyle = '#2a3a58'; ctx.lineWidth = .8;
+    ctx.beginPath(); ctx.moveTo(cx, y+4); ctx.lineTo(cx, y+bh-4); ctx.stroke();
+    ctx.setLineDash([]);
+}
+
+function drawFins(ctx, cx, y, bw, fh, n, shape) {
+    drawOneFin(ctx, cx - bw, y, bw * 1.9, fh, shape, true);
+    drawOneFin(ctx, cx + bw, y, bw * 1.9, fh, shape, false);
+}
+
+function drawOneFin(ctx, x, y, fw, fh, shape, left) {
+    const d = left ? -1 : 1;
+    ctx.beginPath();
+    if (shape === 'trap') {
+        ctx.moveTo(x, y - fh * .2);
+        ctx.lineTo(x + d * fw * .55, y + fh * .25);
+        ctx.lineTo(x + d * fw, y + fh);
+        ctx.lineTo(x, y + fh);
+    } else if (shape === 'ellip') {
+        ctx.moveTo(x, y);
+        ctx.quadraticCurveTo(x + d * fw, y + fh * .25, x + d * fw * .35, y + fh);
+        ctx.lineTo(x, y + fh);
+    } else { // delta
+        ctx.moveTo(x, y - fh * .15);
+        ctx.lineTo(x + d * fw, y + fh);
+        ctx.lineTo(x, y + fh);
+    }
+    ctx.closePath();
+    ctx.fillStyle = '#b83020'; ctx.fill();
+    ctx.strokeStyle = '#7a1a10'; ctx.lineWidth = 1; ctx.stroke();
+}
+
+function drawMotor(ctx, cx, y, mw, mh) {
+    ctx.fillStyle = '#2a3245'; ctx.fillRect(cx - mw, y, mw * 2, mh);
+    ctx.strokeStyle = '#1a2235'; ctx.lineWidth = 1; ctx.strokeRect(cx - mw, y, mw * 2, mh);
+}
+
+// ─────────────────────────────────────────────
+// LAUNCH SCREEN
+// ─────────────────────────────────────────────
+function sizeLaunchCanvas() {
+    const cv = document.getElementById('launch-canvas');
+    cv.width  = cv.offsetWidth  || window.innerWidth;
+    cv.height = cv.offsetHeight || window.innerHeight - 60;
+    drawPad();
+}
+
+function drawPad() {
+    const cv = document.getElementById('launch-canvas');
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+
+    // Sky gradient
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#010208');
+    sky.addColorStop(.65, '#071020');
+    sky.addColorStop(1,  '#101808');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+
+    // Stars
+    for (let i = 0; i < 100; i++) {
+        const sx = ((Math.sin(i * 137.5 + 1) * .5 + .5)) * W;
+        const sy = ((Math.cos(i * 97.3  + 2) * .5 + .5)) * H * .65;
+        ctx.globalAlpha = .15 + (i % 7) * .08;
+        ctx.fillStyle = 'white';
+        ctx.fillRect(sx, sy, i % 3 === 0 ? 1.5 : 1, i % 3 === 0 ? 1.5 : 1);
+    }
+    ctx.globalAlpha = 1;
+
+    // Ground
+    ctx.fillStyle = '#0e1a08'; ctx.fillRect(0, H - 55, W, 55);
+    ctx.fillStyle = '#1a2a10'; ctx.fillRect(0, H - 55, W, 4);
+
+    // Launch gantry
+    const px = W / 2;
+    const groundY = H - 55;
+    ctx.fillStyle = '#2a2a2a'; ctx.fillRect(px - 45, groundY - 6, 90, 6); // pad
+    ctx.fillStyle = '#383838'; ctx.fillRect(px - 4,  groundY - 32, 8, 26); // tower
+    ctx.fillStyle = '#303030'; ctx.fillRect(px + 6,  groundY - 35, 3, 30); // arm
+
+    // Small rocket on pad
+    drawRocketAt(ctx, px, groundY - 32, 1.4);
+
+    // Instruction text
+    ctx.fillStyle = 'rgba(74,158,255,.7)';
+    ctx.font = '12px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText('IGNITION SEQUENCE STARTING…', W / 2, H - 16);
+}
+
+function drawRocketAt(ctx, cx, bottomY, scale) {
+    const bw = Math.max(R.dia * scale * 0.4, 5);
+    const bh = R.len * scale * 0.7;
+    const nh = bw * 2.4;
+    const fh = bw * 1.8;
+    const mh = bw * 0.5;
+    const topY = bottomY - bh - nh;
+
+    drawNose (ctx, cx, topY, bw, nh, R.nose);
+    drawBody (ctx, cx, topY + nh, bw, bh);
+    drawFins (ctx, cx, topY + nh + bh, bw, fh, R.fins, R.finS);
+    drawMotor(ctx, cx, topY + nh + bh + fh * .5, bw * .45, mh);
+}
+
+// ─────────────────────────────────────────────
+// LAUNCH FLOW (countdown → results)
+// Next step: replace showResults() call with real physics sim
+// ─────────────────────────────────────────────
+function goLaunch() {
+    showScreen('launch');
+    let n = 5;
+    const el = document.getElementById('countdown');
+    el.style.cssText = 'display:block; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font:bold 90px Courier New,monospace; color:#4a9eff; text-shadow:0 0 50px #4a9eff; pointer-events:none;';
+    document.getElementById('h-phase').textContent = 'COUNTDOWN';
+
+    const tick = () => {
+        if (n > 0) {
+            el.textContent = n--;
+            setTimeout(tick, 900);
+        } else {
+            el.textContent = 'IGNITION!';
+            document.getElementById('h-phase').textContent = 'POWERED';
+            setTimeout(() => {
+                el.style.display = 'none';
+                // ← NEXT STEP: add real physics animation here
+                // For now: jump to results after short wait
+                setTimeout(showResults, 1500);
+            }, 700);
+        }
+    };
+    tick();
+}
+
+// ─────────────────────────────────────────────
+// RESULTS
+// ─────────────────────────────────────────────
+function showResults() {
+    const M   = MOTORS[R.motorKey];
+    const alt = estAlt();
+    const vel = Math.round((M.avgThrust / ((R.dry + M.propMass) / 1000)) * M.burn * 0.55);
+    const t   = (M.burn + M.delay + 3.5).toFixed(1);
+
+    document.getElementById('res-alt').textContent   = alt;
+    document.getElementById('res-time').textContent  = t + ' s';
+    document.getElementById('res-vel').textContent   = vel + ' m/s';
+    document.getElementById('res-motor').textContent = M.name;
+    document.getElementById('res-name').textContent  = R.name.replace('Estes ','');
+
+    const best = parseInt(localStorage.getItem('eeros_rocket_best') || '0');
+    if (alt > best) {
+        localStorage.setItem('eeros_rocket_best', alt);
+        document.getElementById('res-best').textContent = '★  NEW PERSONAL BEST!';
+        document.getElementById('res-title').textContent = 'MISSION COMPLETE — NEW RECORD!';
+    } else {
+        document.getElementById('res-best').textContent = 'PERSONAL BEST: ' + best + ' m';
+        document.getElementById('res-title').textContent = 'MISSION COMPLETE';
+    }
+    showScreen('results');
+}
+
+// ─────────────────────────────────────────────
+// ROCKET ASSISTANT CHAT
+// ─────────────────────────────────────────────
+const KB = [
+    { k:['higher','altitude','go up','taller'],
+      r:`To go higher: use a lighter rocket + more powerful motor. A C6-5 instead of B6-4 gives you twice the impulse! Also make sure fins aren't too big — they add drag.` },
+    { k:['fin','fins','stable','stability','tip','wobbly','spin'],
+      r:`Fins keep your rocket flying straight — like feathers on an arrow! If fins are too small → rocket tips and crashes. Bigger fins = more stable, but more drag. Check the STABILITY meter on the left!` },
+    { k:['motor','engine','a8','b6','c6','d12','e12','thrust','power','impulse'],
+      r:`Motor codes: C6-5 means → Class C (10 N·s impulse) · 6 Newton avg thrust · 5 second delay before parachute fires. Bigger letter = more power. B6-4 is great for most rockets!` },
+    { k:['parachute','chute','recover','land','fall','float'],
+      r:`The parachute fires after the delay in the motor code (the last number). Bigger parachute = softer landing. But too big = wind carries it far away! 30 cm is good for most rockets.` },
+    { k:['nose','cone','tip','front'],
+      r:`Ogive nose cones (smooth curve) are the best shape — least air resistance = more altitude. Conical (pointy) is simpler. Parabolic (rounded) is somewhere in between.` },
+    { k:['crash','break','explode','wrong','tip over','fail'],
+      r:`Things go wrong when: (1) fins too small → tips over, (2) motor WAY too powerful → body breaks. Check STABILITY and THRUST/WEIGHT on the left before launching!` },
+    { k:['mass','weight','heavy','light','grams'],
+      r:`Lighter rockets go MUCH higher! As the motor burns, the rocket gets lighter — which actually makes it accelerate faster at the end of the burn. Try smaller motors on tiny light rockets!` },
+    { k:['how high','estimate','predict','altitude'],
+      r:`The EST. ALTITUDE number in the bottom-left is my prediction. It's based on your motor power minus the rocket's weight minus air drag. The real simulation (coming in the next step!) will be even more accurate.` },
+    { k:['hello','hi','hey','helo'],
+      r:`Hey Eero! Ready to break altitude records? 🚀 Pick a preset or build your own. Ask me anything about fins, motors, nose cones, stability — I know it all!` },
+    { k:['estes','alpha','viking','bertha','wizard','mosquito','bullpup'],
+      r:`Estes makes the most popular model rocket kits! Estes Alpha and Viking are great first rockets. Big Bertha is big and flies slowly — very stable. Mosquito is tiny and super fast!` },
+    { k:['what','explain','tell me','help'],
+      r:`I can explain: motors, fins, nose cones, stability, mass, altitude, parachutes, and more! What do you want to know about? Try "what do fins do?" or "which motor is best?"` },
+];
+
+function sendChat() {
+    const inp = document.getElementById('chat-in');
+    const msg = inp.value.trim();
+    if (!msg) return;
+    addMsg(msg, 'user');
+    inp.value = '';
+    setTimeout(() => addMsg(botReply(msg), 'bot'), 380);
+}
+
+function addMsg(text, who) {
+    const box = document.getElementById('chat-msgs');
+    const d = document.createElement('div');
+    d.className = 'msg ' + who;
+    d.innerHTML = `<div class="msg-who">${who === 'bot' ? 'ASSISTANT' : 'EERO'}</div>${text}`;
+    box.appendChild(d);
+    box.scrollTop = box.scrollHeight;
+}
+
+function botReply(msg) {
+    const low = msg.toLowerCase();
+    // Context-aware: warn if unstable
+    if ((low.includes('launch') || low.includes('ready') || low.includes('go')) && stability() !== 'STABLE') {
+        return `⚠️ Your rocket is ${stability()} right now! I'd fix that before launching — try bigger fins or a smaller motor.`;
+    }
+    for (const e of KB) {
+        if (e.k.some(k => low.includes(k))) return e.r;
+    }
+    return `Great question! Try asking about: motors, fins, nose cones, altitude, stability, parachutes, or weight. I know everything about model rockets! 🚀`;
+}
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+window.addEventListener('resize', () => {
+    if (document.getElementById('screen-builder').classList.contains('active')) sizeBuilderCanvas();
+    if (document.getElementById('screen-launch').classList.contains('active'))  sizeLaunchCanvas();
+});
+
+sizeBuilderCanvas();
+updateRocket();
+</script>
+</body>
+</html>

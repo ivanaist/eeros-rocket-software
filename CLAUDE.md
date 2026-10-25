@@ -1,5 +1,29 @@
 # Eero's Rocket Software 🚀
 
+---
+
+## 👋 HEY EERO — START HERE
+
+**What's already built (Step 1 ✅):**
+- The rocket builder screen — pick preset kits, change parts, see the rocket drawing update live
+- The launch screen — countdown and launch!
+- The results screen — see how high you went and beat your personal best
+- The rocket assistant chat — ask it anything about rockets
+
+**Your next mission (Step 2):**
+> "Add the real physics engine — make the rocket actually fly up the screen with real numbers!"
+
+**How to work with Claude Code:**
+1. Open Claude Code in this folder (`Eero's rocket project`)
+2. Tell Claude what you want to build next — use the steps in the **Building Order** section below
+3. Test it: the game opens automatically in the browser on the right
+4. When you like what you see, save to GitHub (see the **GitHub** section at the bottom)
+
+**If something goes wrong:** Just tell Claude "this broke" or "that doesn't look right" and describe what you see!
+
+---
+
+
 A model rocket launch simulation game built by Eero (age 10) and his aunt Ivana using Claude Code.
 
 ## What this game does
